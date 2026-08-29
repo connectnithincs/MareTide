@@ -47,7 +47,6 @@ const getAuthenticatedUrl = (url: string, user: string, pass: string) => {
 
 export const AIVision: React.FC = () => {
   const [cameras, setCameras] = useState<{ [key: string]: boolean }>({
-    crew_safety: true,
     sea: true,
     cargo: true,
     ballast: true
@@ -81,7 +80,6 @@ export const AIVision: React.FC = () => {
     try {
       const res = await visionAPI.getStatus();
       setCameras(res.camera_states || {
-        crew_safety: true,
         sea: true,
         cargo: true,
         ballast: true
@@ -140,7 +138,6 @@ export const AIVision: React.FC = () => {
   };
 
   const cameraMetadata = [
-    { id: "crew_safety", label: "Crew Safety Detection", model: "YOLOv8 Live" },
     { id: "sea", label: "Sea State Monitoring", model: "YOLOv8 Live" },
     { id: "cargo", label: "Stowage Cargo Security", model: "Simulated overlays" },
     { id: "ballast", label: "Ballast Leak Monitor", model: "Motion analysis" }
@@ -190,7 +187,6 @@ export const AIVision: React.FC = () => {
               <option value="Normal Voyage">Normal Voyage</option>
               <option value="Cargo Misplacement">Cargo Misplacement</option>
               <option value="Ballast Leak">Ballast Leak</option>
-              <option value="Crew Intrusion">Crew Intrusion</option>
               <option value="Sea Obstacle">Sea Obstacle</option>
             </select>
           </div>

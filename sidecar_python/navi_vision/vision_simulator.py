@@ -9,7 +9,7 @@ class VisionSimulator:
     """
     def __init__(self, callback=None, categories=None, manager=None):
         self.callback = callback
-        self.categories = categories or ["Cargo", "Ballast", "Crew Safety", "Sea"]
+        self.categories = categories or ["Cargo", "Ballast", "Sea"]
         self.manager = manager
         self.running = False
         self.thread = None
@@ -26,7 +26,6 @@ class VisionSimulator:
         mapping = {
             "Cargo": "cargo",
             "Ballast": "ballast",
-            "Crew Safety": "crew_safety",
             "Sea": "sea"
         }
         return self.manager.is_camera_enabled(mapping.get(category))
@@ -68,8 +67,6 @@ class VisionSimulator:
                         detections.append({"category": "Cargo", "type": "normal", "camera": "Cam 1 - Deck View", "confidence": random.uniform(0.95, 0.99)})
                     if "Ballast" in self.categories and self._is_enabled("Ballast"):
                         detections.append({"category": "Ballast", "type": "normal", "camera": "Cam 2 - Ballast Room", "confidence": random.uniform(0.96, 0.99)})
-                    if "Crew Safety" in self.categories and self._is_enabled("Crew Safety"):
-                        detections.append({"category": "Crew Safety", "type": "normal", "camera": "Cam 3 - Restricted Passage", "confidence": random.uniform(0.98, 0.99)})
                     if "Sea" in self.categories and self._is_enabled("Sea"):
                         detections.append({"category": "Sea", "type": "normal", "camera": "Cam 4 - Bow Camera", "confidence": random.uniform(0.95, 0.98)})
             
@@ -80,8 +77,6 @@ class VisionSimulator:
                 if force_emit:
                     if "Ballast" in self.categories and self._is_enabled("Ballast"):
                         detections.append({"category": "Ballast", "type": "normal", "camera": "Cam 2 - Ballast Room", "confidence": random.uniform(0.96, 0.99)})
-                    if "Crew Safety" in self.categories and self._is_enabled("Crew Safety"):
-                        detections.append({"category": "Crew Safety", "type": "normal", "camera": "Cam 3 - Restricted Passage", "confidence": random.uniform(0.98, 0.99)})
                     if "Sea" in self.categories and self._is_enabled("Sea"):
                         detections.append({"category": "Sea", "type": "normal", "camera": "Cam 4 - Bow Camera", "confidence": random.uniform(0.95, 0.98)})
             
@@ -92,22 +87,10 @@ class VisionSimulator:
                 if force_emit:
                     if "Cargo" in self.categories and self._is_enabled("Cargo"):
                         detections.append({"category": "Cargo", "type": "normal", "camera": "Cam 1 - Deck View", "confidence": random.uniform(0.95, 0.99)})
-                    if "Crew Safety" in self.categories and self._is_enabled("Crew Safety"):
-                        detections.append({"category": "Crew Safety", "type": "normal", "camera": "Cam 3 - Restricted Passage", "confidence": random.uniform(0.98, 0.99)})
                     if "Sea" in self.categories and self._is_enabled("Sea"):
                         detections.append({"category": "Sea", "type": "normal", "camera": "Cam 4 - Bow Camera", "confidence": random.uniform(0.95, 0.98)})
             
-            # Crew Intrusion scenario
-            elif current_scenario == "Crew Intrusion":
-                if "Crew Safety" in self.categories and self._is_enabled("Crew Safety"):
-                    detections.append({"category": "Crew Safety", "type": "intrusion", "camera": "Cam 3 - Restricted Passage", "confidence": random.uniform(0.92, 0.97)})
-                if force_emit:
-                    if "Cargo" in self.categories and self._is_enabled("Cargo"):
-                        detections.append({"category": "Cargo", "type": "normal", "camera": "Cam 1 - Deck View", "confidence": random.uniform(0.95, 0.99)})
-                    if "Ballast" in self.categories and self._is_enabled("Ballast"):
-                        detections.append({"category": "Ballast", "type": "normal", "camera": "Cam 2 - Ballast Room", "confidence": random.uniform(0.96, 0.99)})
-                    if "Sea" in self.categories and self._is_enabled("Sea"):
-                        detections.append({"category": "Sea", "type": "normal", "camera": "Cam 4 - Bow Camera", "confidence": random.uniform(0.95, 0.98)})
+
             
             # Sea Obstacle scenario
             elif current_scenario == "Sea Obstacle":
@@ -118,8 +101,7 @@ class VisionSimulator:
                         detections.append({"category": "Cargo", "type": "normal", "camera": "Cam 1 - Deck View", "confidence": random.uniform(0.95, 0.99)})
                     if "Ballast" in self.categories and self._is_enabled("Ballast"):
                         detections.append({"category": "Ballast", "type": "normal", "camera": "Cam 2 - Ballast Room", "confidence": random.uniform(0.96, 0.99)})
-                    if "Crew Safety" in self.categories and self._is_enabled("Crew Safety"):
-                        detections.append({"category": "Crew Safety", "type": "normal", "camera": "Cam 3 - Restricted Passage", "confidence": random.uniform(0.98, 0.99)})
+
 
             # Fire callback if configured
             if self.callback and detections:

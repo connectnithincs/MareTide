@@ -19,7 +19,6 @@ ENABLE_YOLO = True
 ACTIVE_CAMERAS = {
     "Cam 1 - Deck View": "Cargo",
     "Cam 2 - Ballast Room": "Ballast",
-    "Cam 3 - Restricted Passage": "Crew Safety",
     "Cam 4 - Bow Camera": "Sea"
 }
 
@@ -30,13 +29,12 @@ CAMERA_ASSETS = {
 }
 
 # Canonical Camera IDs
-CAMERA_IDS = ["cargo", "ballast", "crew_safety", "sea"]
+CAMERA_IDS = ["cargo", "ballast", "sea"]
 
 # Canonical display labels matching app.py UI
 CAMERA_LABELS = {
     "cargo": "Cam 1 - Deck View",
     "ballast": "Cam 2 - Ballast Room",
-    "crew_safety": "Cam 3 - Restricted Passage (YOLO)",
     "sea": "Cam 4 - Bow Camera (YOLO)"
 }
 
@@ -44,13 +42,10 @@ CAMERA_LABELS = {
 CAMERA_MAP = {
     "Cam 1 - Deck View": "cargo",
     "Cam 2 - Ballast Room": "ballast",
-    "Cam 3 - Restricted Passage": "crew_safety",
-    "Cam 3 - Restricted Passage (YOLO)": "crew_safety",
     "Cam 4 - Bow Camera": "sea",
     "Cam 4 - Bow Camera (YOLO)": "sea",
     "cargo": "cargo",
     "ballast": "ballast",
-    "crew_safety": "crew_safety",
     "sea": "sea"
 }
 
@@ -58,6 +53,5 @@ CAMERA_MAP = {
 DEFAULT_CAMERA_STATES = {
     "cargo": True,
     "ballast": True,
-    "crew_safety": True,
     "sea": True,
 }

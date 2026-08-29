@@ -52,9 +52,8 @@ def frame_generator(cam_id):
     manager = state.get_vision_manager()
     while True:
         frame = None
-        if cam_id in ["crew_safety", "sea"]:
-            yolo_key = "Crew Safety" if cam_id == "crew_safety" else "Sea"
-            frame = manager.get_latest_frame(yolo_key)
+        if cam_id == "sea":
+            frame = manager.get_latest_frame("Sea")
         else:
             frame = manager.get_camera_frame(cam_id)
             
@@ -685,7 +684,7 @@ async def voyage_track(imo: str):
 
 @app.get("/api/video/{camera_id}")
 async def video_stream(camera_id: str):
-    valid_ids = ["crew_safety", "sea", "cargo", "ballast"]
+    valid_ids = ["sea", "cargo", "ballast"]
     if camera_id not in valid_ids:
         raise HTTPException(status_code=400, detail="Invalid camera feed ID")
     return StreamingResponse(

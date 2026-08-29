@@ -66,15 +66,7 @@ def evaluate(detection, manager=None):
             message = "Ballast pumping station and tanks show visual integrity."
             recommendation = "No action required."
             
-    elif category == "Crew Safety":
-        if det_type == "intrusion":
-            severity = "EMERGENCY"
-            message = "Unauthorized crew entry detected in high-voltage / restricted deck zone."
-            recommendation = "Initiate bridge safety announcement for restricted zone. Verify crew tracker location."
-        else:
-            severity = "INFO"
-            message = "Restricted safety passage clear."
-            recommendation = "No action required."
+
             
     elif category == "Sea":
         if det_type == "obstacle":

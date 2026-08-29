@@ -75,8 +75,8 @@ def main():
         sidecar_proc.terminate()
         sys.exit(1)
 
-    # 3. Node.js API Gateway (Port 8002)
-    print("Launching Node.js API Gateway on port 8002...")
+    # 3. Node.js API Gateway (Port 8010)
+    print("Launching Node.js API Gateway on port 8010...")
     # Find node.exe in PATH
     node_cmd = ["node", "src/server.js"]
     if os.name == "nt":
@@ -84,7 +84,7 @@ def main():
     else:
         node_proc = subprocess.Popen(node_cmd, cwd="backend_node")
 
-    if not wait_for_ready("http://localhost:8002/api/auth/session", "Node.js Gateway"):
+    if not wait_for_ready("http://localhost:8010/api/auth/session", "Node.js Gateway"):
         flask_proc.terminate()
         sidecar_proc.terminate()
         node_proc.terminate()
@@ -108,7 +108,7 @@ def main():
     print("\nAll MareTide JS Services launched successfully.")
     print("- Authentication Login Portal: http://localhost:5000")
     print("- React Dashboard (Dev): http://localhost:3000")
-    print("- Express API Gateway: http://localhost:8002")
+    print("- Express API Gateway: http://localhost:8010")
     print("- FastAPI Python Sidecar: http://localhost:8001\n")
 
     # Automatically open browser pointing to Flask authentication landing page

@@ -83,7 +83,6 @@ class VisionYOLORunner:
         
         # Latest annotated RGB frames
         self.frames = {
-            "Crew Safety": None,
             "Sea": None
         }
         
@@ -101,20 +100,18 @@ class VisionYOLORunner:
             safe_print(f"ERROR: Failed to load YOLO model: {e}")
             self.model = YOLO("yolov8n.pt")
 
-        crew_path = os.path.join(self.base_dir, "assets", "crew_safety", "video.mp4")
         sea_path = os.path.join(self.base_dir, "assets", "sea", "video.mp4")
 
         self._sources = {
-            "crew_safety": _ChannelSource(crew_path),
             "sea": _ChannelSource(sea_path),
         }
         self._source_lock = threading.Lock()
         self._source_changed = threading.Event()
 
     def set_source(self, camera_key: str, mode: str, device_index: int = 0):
-        """camera_key: 'crew_safety' or 'sea'. mode: 'simulated' or 'live'."""
+        """camera_key: 'sea'. mode: 'simulated' or 'live'."""
         if camera_key not in self._sources:
-            raise KeyError(f"Unknown camera_key '{camera_key}' — expected 'crew_safety' or 'sea'")
+            raise KeyError(f"Unknown camera_key '{camera_key}' — expected 'sea'")
         if mode not in ("simulated", "live"):
             raise ValueError(f"Unknown source mode '{mode}' — expected 'simulated' or 'live'")
         with self._source_lock:
@@ -148,17 +145,9 @@ class VisionYOLORunner:
 
     def _run_loop(self):
         safe_print("DEBUG: _run_loop thread has started executing")
-        crew_source = self._sources["crew_safety"]
         sea_source = self._sources["sea"]
 
-        crew_source.open()
         sea_source.open()
-
-        if crew_source.mode == "simulated":
-            if crew_source.cap and crew_source.cap.isOpened():
-                safe_print(f"SUCCESS: Opened crew safety video path: {crew_source.video_path}")
-            else:
-                safe_print(f"ERROR: Failed to open crew safety video path: {crew_source.video_path}")
 
         if sea_source.mode == "simulated":
             if sea_source.cap and sea_source.cap.isOpened():
@@ -172,91 +161,14 @@ class VisionYOLORunner:
             if self._source_changed.is_set():
                 with self._source_lock:
                     self._source_changed.clear()
-                crew_source.open()
                 sea_source.open()
 
-            crew_enabled = self._is_enabled("crew_safety")
             sea_enabled = self._is_enabled("sea")
             
-            if not crew_enabled and not sea_enabled:
+            if not sea_enabled:
                 time.sleep(0.3)
                 continue
-                
-            # Process Crew Safety
-            if crew_enabled:
-                ret, frame = crew_source.read()
-                    
-                if ret and frame is not None:
-                    # Run YOLOv8 on the frame (only filter for 'person', class 0)
-                    results = self.model(frame, classes=[0], verbose=False)
-                    
-                    h, w, _ = frame.shape
-                    # Define a restricted safety zone polygon in the center-right part of the corridor
-                    poly = [
-                        (int(w * 0.45), int(h * 0.2)), 
-                        (int(w * 0.95), int(h * 0.2)), 
-                        (int(w * 0.95), int(h * 0.95)), 
-                        (int(w * 0.45), int(h * 0.95))
-                    ]
-                    pts = np.array(poly, np.int32).reshape((-1, 1, 2))
-                    
-                    # Draw restricted passage zone polygon
-                    cv2.polylines(frame, [pts], True, (0, 255, 255), 2)
-                    cv2.putText(frame, "RESTRICTED PASSAGE ZONE", (poly[0][0], poly[0][1] - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-                    
-                    intrusion_detected = False
-                    highest_conf = 0.0
-                    
-                    for result in results:
-                        boxes = result.boxes
-                        for box in boxes:
-                            conf = float(box.conf[0])
-                            xyxy = box.xyxy[0].cpu().numpy()
-                            x1, y1, x2, y2 = map(int, xyxy)
-                            
-                            # Bounding box center
-                            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                            
-                            # Check if the person is inside the restricted zone
-                            dist = cv2.pointPolygonTest(pts, (cx, cy), False)
-                            in_zone = dist >= 0
-                            
-                            color = (0, 0, 255) if in_zone else (0, 255, 0) # Red if inside zone, else Green
-                            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                            cv2.putText(frame, f"Person {conf * 100:.1f}%", (x1, y1 - 10), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-                            
-                            if in_zone:
-                                intrusion_detected = True
-                                highest_conf = max(highest_conf, conf)
-                                
-                    # Emit alert periodically or immediately on change
-                    try:
-                        if intrusion_detected:
-                            if self.callback:
-                                self.callback({
-                                    "category": "Crew Safety",
-                                    "type": "intrusion",
-                                    "camera": "Cam 3 - Restricted Passage",
-                                    "confidence": highest_conf
-                                })
-                        else:
-                            # Periodically emit normal status (e.g., every 30 frames)
-                            if frame_counter % 30 == 0 and self.callback:
-                                self.callback({
-                                    "category": "Crew Safety",
-                                    "type": "normal",
-                                    "camera": "Cam 3 - Restricted Passage",
-                                    "confidence": 0.99
-                                })
-                    except Exception as e:
-                        safe_print(f"ERROR: Crew Safety detection callback failed: {e}")
-                            
-                    # Save annotated frame as RGB
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    with self.lock:
-                        self.frames["Crew Safety"] = frame_rgb
+
 
             # Process Sea Lane
             if sea_enabled:
@@ -322,5 +234,4 @@ class VisionYOLORunner:
             time.sleep(0.1)
             
         # Clean up
-        crew_source.close()
         sea_source.close()
