@@ -63,7 +63,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const connect = () => {
       console.log("Connecting to telemetry WebSocket...");
-      const ws = new WebSocket("ws://localhost:8000/ws/telemetry");
+      const ws = new WebSocket("ws://localhost:8002/ws/telemetry");
       wsRef.current = ws;
 
       ws.onopen = () => {

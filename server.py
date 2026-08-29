@@ -30,14 +30,17 @@ CREDENTIALS = {
 def index():
     if request.headers.get("User-Agent") == "MareTide Poller":
         return "Flask Auth Server Ready"
-    # Bypass login screen: immediately log in and redirect to React dashboard
-    token = str(uuid.uuid4())
-    valid_tokens[token] = {
-        "user": "admin@maretide.com",
-        "expires": time.time() + 60
-    }
-    session['user'] = "admin@maretide.com"
-    return redirect(f"http://localhost:3000/?token={token}")
+    
+    # Respect the configuration flag for automatic login
+    if AUTO_LOGIN_IF_SESSION_EXISTS and 'user' in session:
+        token = str(uuid.uuid4())
+        valid_tokens[token] = {
+            "user": session['user'],
+            "expires": time.time() + 60
+        }
+        return redirect(f"http://localhost:3000/?token={token}")
+        
+    return render_template('login.html')
 
 @app.route('/login', methods=['POST'])
 def login():
