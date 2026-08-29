@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>smmplanner. — Users</title>
+<style>
+  :root{
+    --navy-950:#021024;
+    --navy-800:#052659;
+    --blue-500:#5483B3;
+    --blue-300:#7DA0CA;
+    --blue-100:#C1E8FF;
+    --white:#ffffff;
+    --bg:#EAF4FF;
+    --text-dark:#021024;
+    --text-mid:#3D5A80;
+    --text-soft:#7DA0CA;
+    --danger:#E7594B;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  body{
+    font-family:'Inter','Segoe UI',Arial,sans-serif;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(193,232,255,0.6), transparent 40%),
+      var(--bg);
+    color:var(--text-dark);
+    min-height:100vh;
+    padding:28px;
+  }
+
+  .app{
+    display:flex;
+    gap:20px;
+    max-width:1280px;
+    margin:0 auto;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:230px;
+    flex-shrink:0;
+    background:linear-gradient(180deg, var(--navy-950) 0%, var(--navy-800) 100%);
+    border-radius:24px;
+    padding:24px 18px;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 20px 40px -14px rgba(2,16,36,0.45);
+  }
+
+  .logo{
+    font-size:17px;
+    font-weight:700;
+    color:var(--blue-100);
+    letter-spacing:.2px;
+    margin-bottom:26px;
+    padding-left:4px;
+  }
+  .logo::after{content:"."; color:var(--blue-500);}
+
+  .profile{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:rgba(193,232,255,0.06);
+    border:1px solid rgba(125,160,202,0.25);
+    border-radius:16px;
+    padding:10px 12px;
+    margin-bottom:24px;
+  }
+  .profile img{
+    width:38px;height:38px;border-radius:50%;
+    object-fit:cover;
+    border:2px solid var(--blue-500);
+  }
+  .profile .name{font-size:13.5px; font-weight:600; color:var(--blue-100);}
+  .profile .role{font-size:11px; color:var(--blue-300); margin-top:1px;}
+
+  nav{display:flex; flex-direction:column; gap:2px; flex:1;}
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:11px 12px;
+    border-radius:12px;
+    color:var(--blue-300);
+    font-size:13.5px;
+    font-weight:500;
+    cursor:pointer;
+    position:relative;
+    transition:background .15s ease, color .15s ease;
+  }
+  .nav-item svg{width:18px; height:18px; opacity:.85; flex-shrink:0;}
+  .nav-item:hover{background:rgba(84,131,179,0.18); color:var(--blue-100);}
+  .nav-item.active{
+    background:rgba(84,131,179,0.28);
+    color:var(--blue-100);
+  }
+  .nav-item.active::before{
+    content:"";
+    position:absolute;
+    left:-18px;
+    top:50%;
+    transform:translateY(-50%);
+    width:4px;
+    height:22px;
+    border-radius:0 4px 4px 0;
+    background:var(--blue-100);
+  }
+
+  .requests-card{
+    margin-top:16px;
+    background:linear-gradient(135deg, var(--blue-500), var(--navy-800));
+    border-radius:16px;
+    padding:14px 16px;
+    color:var(--white);
+    position:relative;
+    overflow:hidden;
+  }
+  .requests-card .dots{position:absolute; top:10px; right:12px; color:rgba(255,255,255,0.6); font-size:13px; cursor:pointer;}
+  .requests-card .bell{
+    width:30px;height:30px;border-radius:9px;
+    background:rgba(255,255,255,0.18);
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:10px;
+  }
+  .requests-card .bell svg{width:15px;height:15px;}
+  .requests-card h4{font-size:13px; font-weight:600; margin-bottom:4px;}
+  .requests-card p{font-size:11.5px; color:rgba(255,255,255,0.75); line-height:1.4;}
+
+  /* ---------- Main ---------- */
+  .main{flex:1; min-width:0;}
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    margin-bottom:18px;
+  }
+  .search{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--white);
+    border:1px solid rgba(84,131,179,0.2);
+    border-radius:14px;
+    padding:11px 16px;
+    width:320px;
+    box-shadow:0 8px 20px -12px rgba(2,16,36,0.15);
+  }
+  .search input{
+    border:none; outline:none; flex:1;
+    font-size:13.5px; color:var(--text-dark); background:transparent;
+  }
+  .search input::placeholder{color:var(--text-soft);}
+  .search svg{width:16px; height:16px; color:var(--blue-500); flex-shrink:0;}
+
+  .panel{
+    background:var(--white);
+    border-radius:26px;
+    padding:26px 26px 8px;
+    box-shadow:0 30px 60px -30px rgba(2,16,36,0.25);
+    position:relative;
+  }
+
+  .panel-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:20px;
+  }
+  .panel-header h1{font-size:22px; font-weight:700; color:var(--navy-950);}
+
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:16px;
+    margin-bottom:24px;
+  }
+  .stat-card{
+    background:linear-gradient(180deg, #F5FAFF 0%, #ffffff 100%);
+    border:1px solid rgba(125,160,202,0.25);
+    border-radius:18px;
+    padding:16px 18px;
+    position:relative;
+  }
+  .stat-card .icon{
+    width:38px;height:38px;
+    border-radius:11px;
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:22px;
+    background:var(--blue-500);
+    color:var(--white);
+  }
+  .stat-card .icon svg{width:18px;height:18px;}
+  .stat-card .dot{
+    position:absolute; top:20px; right:18px;
+    width:9px;height:9px;border-radius:50%;
+    background:var(--blue-100);
+    border:2px solid var(--blue-300);
+  }
+  .stat-card .value{font-size:24px; font-weight:700; color:var(--navy-950);}
+  .stat-card .label{font-size:12px; color:var(--text-soft); margin-top:2px;}
+
+  .add-user{
+    border:1.5px dashed var(--blue-300);
+    border-radius:18px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    color:var(--blue-500);
+    font-size:13px;
+    font-weight:600;
+    gap:8px;
+    cursor:pointer;
+    background:rgba(193,232,255,0.25);
+    transition:background .15s ease;
+  }
+  .add-user:hover{background:rgba(193,232,255,0.5);}
+  .add-user .plus{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--white);
+    border:1.5px dashed var(--blue-300);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px; color:var(--blue-500);
+  }
+
+  /* filters */
+  .filters{
+    display:grid;
+    grid-template-columns:1.3fr 1.3fr 1fr 1fr .8fr 1.1fr;
+    gap:14px;
+    font-size:11.5px;
+    color:var(--text-soft);
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+    padding:0 6px 10px;
+  }
+  .filters input, .filters select{
+    display:block;
+    width:100%;
+    margin-top:8px;
+    border:1px solid rgba(125,160,202,0.3);
+    border-radius:10px;
+    padding:9px 10px;
+    font-size:12.5px;
+    color:var(--text-dark);
+    background:var(--white);
+    text-transform:none;
+    font-weight:500;
+    outline:none;
+  }
+  .filters input::placeholder{color:var(--text-soft);}
+
+  .table{border-top:1px solid rgba(125,160,202,0.2);}
+  .row{
+    display:grid;
+    grid-template-columns:1.3fr 1.3fr 1fr 1fr .8fr 1.1fr;
+    align-items:center;
+    gap:14px;
+    padding:14px 6px;
+    border-bottom:1px solid rgba(125,160,202,0.15);
+  }
+  .user-cell{display:flex; align-items:center; gap:10px;}
+  .user-cell img{width:34px; height:34px; border-radius:50%; object-fit:cover;}
+  .user-cell span{font-size:13px; font-weight:600; color:var(--navy-950);}
+
+  .email-cell{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-mid);}
+  .email-cell svg{width:13px; height:13px; color:var(--blue-300); cursor:pointer;}
+
+  .org-cell{display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text-mid); font-weight:500;}
+  .org-cell svg{width:12px;height:12px; color:var(--blue-300);}
+
+  .badge{
+    display:inline-flex;
+    padding:5px 12px;
+    border-radius:20px;
+    font-size:11.5px;
+    font-weight:600;
+    width:fit-content;
+  }
+  .badge.system{background:#FCE4E1; color:#C1432F;}
+  .badge.manager{background:#EAF0FA; color:var(--text-mid);}
+  .badge.admin{background:#DDEBFF; color:var(--navy-800);}
+
+  .tfa svg{width:15px; height:15px;}
+  .tfa.ok svg{color:var(--blue-500);}
+  .tfa.warn{color:var(--danger); display:flex; align-items:center; gap:4px; font-size:12px; font-weight:700;}
+
+  .meta-cell{display:flex; align-items:center; justify-content:space-between; gap:6px;}
+  .meta-cell .date{font-size:11.5px; color:var(--text-soft);}
+  .meta-cell .icons{display:flex; align-items:center; gap:10px; color:var(--blue-300);}
+  .meta-cell .icons svg{width:15px; height:15px; cursor:pointer;}
+
+  .pagination{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:22px 0 24px;
+  }
+  .pagination button{
+    width:32px;height:32px;
+    border-radius:9px;
+    border:none;
+    background:transparent;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--text-mid);
+    cursor:pointer;
+  }
+  .pagination button.active{background:var(--navy-800); color:var(--white);}
+  .pagination .dots{color:var(--text-soft);}
+  .pagination .arrow{color:var(--blue-500); display:flex; align-items:center; justify-content:center;}
+  .pagination .arrow svg{width:14px;height:14px;}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">smmplanner</div>
+
+    <div class="profile">
+      <img src="https://i.pravatar.cc/80?img=52" alt="">
+      <div>
+        <div class="name">Ivon Orton</div>
+        <div class="role">System Admin</div>
+      </div>
+    </div>
+
+    <nav>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>
+        Analytics
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Event Viewer
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><path d="M16 4.2c1.7.4 3 2 3 3.8s-1.3 3.4-3 3.8M22 20c0-2.7-2.1-5-5-5.7"/></svg>
+        Organizations
+      </div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="3.2"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M17 8.5c1.4.4 2.4 1.7 2.4 3.1s-1 2.7-2.4 3.1"/><path d="M22 20c0-2.6-1.8-4.8-4.2-5.6"/></svg>
+        Users
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15 1.65 1.65 0 0 0 3.17 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.11.63.5 1.17 1.06 1.51H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+    </nav>
+
+    <div class="requests-card">
+      <div class="dots">⋮</div>
+      <div class="bell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      </div>
+      <h4>New requests</h4>
+      <p>Check your new registration requests</p>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div class="search">
+        <input type="text" placeholder="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h1>Users</h1>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><path d="M16 4.2c1.7.4 3 2 3 3.8s-1.3 3.4-3 3.8M22 20c0-2.7-2.1-5-5-5.7"/></svg>
+          </div>
+          <span class="dot"></span>
+          <div class="value">124</div>
+          <div class="label">Total Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 8.7 8 10 4.5-1.3 8-5 8-10V5l-8-3Z"/></svg>
+          </div>
+          <span class="dot"></span>
+          <div class="value">36</div>
+          <div class="label">Admins</div>
+        </div>
+        <div class="stat-card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+          </div>
+          <span class="dot"></span>
+          <div class="value">86</div>
+          <div class="label">Managers</div>
+        </div>
+        <div class="stat-card add-user">
+          <div class="plus">+</div>
+          Add User
+        </div>
+      </div>
+
+      <div class="filters">
+        <div>Name<input type="text" placeholder="Type to filter.."></div>
+        <div>E-mail<input type="text" placeholder="Type to filter.."></div>
+        <div>Organization
+          <select><option>All</option></select>
+        </div>
+        <div>Role
+          <select><option>All</option></select>
+        </div>
+        <div>TFA&nbsp;?
+          <select><option>All</option></select>
+        </div>
+        <div>Last Active
+          <select><option>By Activity</option></select>
+        </div>
+      </div>
+
+      <div class="table">
+
+        <div class="row">
+          <div class="user-cell">
+            <img src="https://i.pravatar.cc/80?img=13" alt="">
+            <span>Devon Lane</span>
+          </div>
+          <div class="email-cell">user@gmail.com
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </div>
+          <div class="org-cell">smmplanner
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4 10 14M6 4H4v16h16v-2"/></svg>
+          </div>
+          <div><span class="badge system">System Admin</span></div>
+          <div class="tfa ok">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div class="meta-cell">
+            <span class="date">09 Oct 2020 / 20:22</span>
+            <span class="icons">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4H12l-5 2 1.2-4.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="user-cell">
+            <img src="https://i.pravatar.cc/80?img=32" alt="">
+            <span>Leslie Alexander</span>
+          </div>
+          <div class="email-cell">test@gmail.com
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </div>
+          <div class="org-cell">Seowarriors
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4 10 14M6 4H4v16h16v-2"/></svg>
+          </div>
+          <div><span class="badge manager">Manager</span></div>
+          <div class="tfa warn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+          </div>
+          <div class="meta-cell">
+            <span class="date">09 Oct 2020 / 20:22</span>
+            <span class="icons">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4H12l-5 2 1.2-4.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="user-cell">
+            <img src="https://i.pravatar.cc/80?img=15" alt="">
+            <span>Ralph Edwards</span>
+          </div>
+          <div class="email-cell">login@gmail.com
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </div>
+          <div class="org-cell">Digital
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4 10 14M6 4H4v16h16v-2"/></svg>
+          </div>
+          <div><span class="badge admin">Company Admin</span></div>
+          <div class="tfa ok">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div class="meta-cell">
+            <span class="date">09 Oct 2020 / 20:22</span>
+            <span class="icons">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4H12l-5 2 1.2-4.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="user-cell">
+            <img src="https://i.pravatar.cc/80?img=47" alt="">
+            <span>Jane Cooper</span>
+          </div>
+          <div class="email-cell">smmadv@gmail.com
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </div>
+          <div class="org-cell">SocialMedia
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4 10 14M6 4H4v16h16v-2"/></svg>
+          </div>
+          <div><span class="badge admin">Company Admin</span></div>
+          <div class="tfa ok">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div class="meta-cell">
+            <span class="date">09 Oct 2020 / 20:22</span>
+            <span class="icons">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4H12l-5 2 1.2-4.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="pagination">
+        <button class="active">1</button>
+        <button>2</button>
+        <button>3</button>
+        <button>4</button>
+        <span class="dots">…</span>
+        <button class="arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

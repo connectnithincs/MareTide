@@ -1,0 +1,17 @@
+# Dependencies
+**/node_modules/
+**/.venv/
+**/venv/
+
+# Caches and builds
+**/__pycache__/
+**/*.pyc
+**/dist/
+**/.system_generated/
+**/.idea/
+**/.vscode/
+**/.DS_Store
+
+# Databases
+**/*.db
+**/*.db-journal

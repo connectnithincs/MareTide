@@ -1,0 +1,381 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Cormorant+Garamond:wght@600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* Pulled from the ship image */
+      --ocean-deep:  #0D2B35;
+      --ocean-mid:   #134455;
+      --teal:        #1B7A8A;
+      --cargo-amber: #D4600A;
+      --cargo-gold:  #E8920A;
+      --mist:        rgba(255,255,255,0.06);
+      --mist-border: rgba(255,255,255,0.10);
+      --text-hi:     #EDF4F6;
+      --text-lo:     rgba(237,244,246,0.48);
+      --error:       #F06060;
+    }
+
+    html, body { height: 100%; font-family: 'DM Sans', sans-serif; overflow: hidden; }
+
+    /* ── VIDEO ── */
+    .video-wrap {
+      position: fixed; inset: 0; z-index: 0;
+    }
+    #bg-video {
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: center top;
+    }
+    /* Gradient: left stays visible for brand text, right darkens behind card */
+    .video-wrap::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        105deg,
+        rgba(13,43,53,0.30) 0%,
+        rgba(13,43,53,0.55) 45%,
+        rgba(9,28,36,0.82) 100%
+      );
+    }
+
+    /* ── PAGE LAYOUT: left brand + right card ── */
+    .page {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      align-items: center;
+    }
+
+    /* ── LEFT BRAND AREA ── */
+    .brand-area {
+      padding: 3rem 3.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2rem;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-mark {
+      width: 44px; height: 44px;
+      border: 1.5px solid var(--cargo-amber);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-mark svg { width: 22px; height: 22px; stroke: var(--cargo-amber); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    .logo-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-hi);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .brand-headline {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.6rem, 4.5vw, 4rem);
+      font-weight: 700;
+      color: var(--text-hi);
+      line-height: 1.08;
+      letter-spacing: -0.01em;
+      max-width: 520px;
+    }
+
+    .brand-headline em {
+      font-style: normal;
+      color: var(--cargo-gold);
+    }
+
+    .brand-tagline {
+      font-size: 0.88rem;
+      color: var(--text-lo);
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      max-width: 380px;
+      line-height: 1.7;
+    }
+
+    /* Stat strip */
+    .stat-strip {
+      display: flex;
+      gap: 2.5rem;
+      margin-top: 0.5rem;
+    }
+    .stat { display: flex; flex-direction: column; gap: 0.2rem; }
+    .stat-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--text-hi);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--text-lo);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* Thin horizontal rule accent */
+    .rule {
+      width: 48px; height: 2px;
+      background: var(--cargo-amber);
+      border-radius: 1px;
+    }
+
+    /* ── RIGHT LOGIN CARD ── */
+    .card-wrap {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 2rem 2.5rem 2rem 1rem;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: rgba(9, 24, 33, 0.70);
+      border: 1px solid var(--mist-border);
+      border-radius: 20px;
+      padding: 2.6rem 2.25rem 2.25rem;
+      backdrop-filter: blur(28px) saturate(130%);
+      -webkit-backdrop-filter: blur(28px) saturate(130%);
+      box-shadow:
+        0 32px 64px rgba(0,0,0,0.55),
+        0 0 0 0.5px rgba(255,255,255,0.05) inset,
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      animation: slide-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateX(32px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Card header */
+    .card-eyebrow {
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--cargo-amber);
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.95rem;
+      font-weight: 700;
+      color: var(--text-hi);
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.35rem;
+    }
+
+    .card-sub {
+      font-size: 0.8rem;
+      color: var(--text-lo);
+      font-weight: 300;
+      margin-bottom: 2rem;
+    }
+
+    /* Fields */
+    .field { margin-bottom: 1.05rem; }
+
+    .field label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--text-lo);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.42rem;
+    }
+
+    .input-wrap { position: relative; }
+
+    .input-wrap .icon {
+      position: absolute;
+      left: 13px; top: 50%;
+      transform: translateY(-50%);
+      width: 15px; height: 15px;
+      stroke: var(--text-lo);
+      fill: none; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round;
+      pointer-events: none;
+      transition: stroke 0.2s;
+    }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 10px;
+      padding: 0.7rem 0.9rem 0.7rem 2.5rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.875rem;
+      color: var(--text-hi);
+      outline: none;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+
+    input::placeholder { color: var(--text-lo); }
+
+    input:focus {
+      border-color: var(--teal);
+      background: rgba(27,122,138,0.10);
+      box-shadow: 0 0 0 3px rgba(27,122,138,0.22);
+    }
+
+    .input-wrap:focus-within .icon { stroke: var(--teal); }
+
+    /* Password toggle */
+    .toggle-pw {
+      position: absolute;
+      right: 11px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--text-lo);
+      display: flex; align-items: center;
+      transition: color 0.2s;
+      padding: 3px;
+    }
+    .toggle-pw:hover { color: var(--text-hi); }
+    .toggle-pw svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    input[type="password"] { padding-right: 2.4rem; }
+
+    /* Extras row */
+    .extras {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0.4rem 0 1.5rem;
+    }
+
+    .remember {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.78rem; color: var(--text-lo);
+      cursor: pointer; user-select: none;
+    }
+    .remember input[type="checkbox"] { accent-color: var(--teal); width: 13px; height: 13px; }
+    .remember:hover { color: var(--text-hi); }
+
+    .forgot {
+      font-size: 0.78rem;
+      color: var(--cargo-amber);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .forgot:hover { color: var(--cargo-gold); }
+
+    /* Error */
+    .error-msg {
+      font-size: 0.76rem;
+      color: var(--error);
+      margin-top: -0.55rem;
+      margin-bottom: 0.9rem;
+      display: none;
+      padding-left: 0.1rem;
+    }
+    .error-msg.show { display: block; }
+
+    /* Submit */
+    .btn-signin {
+      width: 100%;
+      padding: 0.82rem;
+      background: linear-gradient(135deg, var(--cargo-amber) 0%, var(--cargo-gold) 100%);
+      border: none; border-radius: 10px;
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem; font-weight: 600;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 6px 22px rgba(212,96,10,0.38);
+      position: relative; overflow: hidden;
+    }
+    .btn-signin:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 30px rgba(212,96,10,0.50);
+    }
+    .btn-signin:active { transform: translateY(0); }
+    .btn-signin .btn-label { transition: opacity 0.2s; }
+    .btn-signin.loading .btn-label { opacity: 0; }
+    .btn-signin .spinner {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .btn-signin.loading .spinner { opacity: 1; }
+    .spinner svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2.5; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Divider */
+    .divider {
+      display: flex; align-items: center; gap: 0.7rem;
+      margin: 1.4rem 0 1rem;
+      font-size: 0.72rem; color: var(--text-lo); letter-spacing: 0.06em;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    /* Badge strip under button */
+    .badge-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.1rem;
+      margin-top: 1.5rem;
+    }
+    .badge {
+      display: flex; align-items: center; gap: 0.35rem;
+      font-size: 0.68rem; color: var(--text-lo); letter-spacing: 0.04em;
+    }
+    .badge svg { width: 12px; height: 12px; stroke: var(--teal); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Success screen */
+    .success-screen {
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; gap: 0.9rem; padding: 1rem 0;
+    }
+    .success-screen.show { display: flex; }
+    .success-icon {
+      width: 52px; height: 52px;
+      border: 1.5px solid var(--cargo-amber);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .success-icon svg { width: 22px; height: 22px; stroke: var(--cargo-amber); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .success-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; color: var(--text-hi); font-weight: 700; }
+    .success-sub { font-size: 0.88rem; color: var(--text-lo); }
+
+    /* Responsive: stack on small screens */
+    @media (max-width: 860px) {
+      .page { grid-template-columns: 1fr; }
+      .brand-area { display: none; }
+      .card-wrap {
+        justify-content: center;
+        padding: 2rem 1.25rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card { animation: none; }
+      .btn-signin { transition: none; }
+    }

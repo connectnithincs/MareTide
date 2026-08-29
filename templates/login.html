@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MareTide — Secure Access</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}" />
+</head>
+<body>
+
+<!-- VIDEO BACKGROUND -->
+<div class="video-wrap">
+  <video id="bg-video" autoplay muted loop playsinline>
+    <source src="{{ url_for('static', filename='videos/background.mp4') }}" type="video/mp4">
+  </video>
+</div>
+
+<div class="page">
+
+  <!-- LEFT: Brand statement -->
+  <div class="brand-area">
+    <div class="logo-row">
+      <div class="logo-mark" style="background-color: #FFFFFF; overflow: hidden; padding: 4px; border: 1px solid var(--cargo-amber);">
+        <img src="{{ url_for('static', filename='logo.png') }}" style="width: 100%; height: 100%; object-fit: contain;" />
+      </div>
+      <span class="logo-text">MareTide</span>
+    </div>
+
+    <div>
+      <div class="rule"></div>
+      <br>
+      <h1 class="brand-headline">
+        Navigate global<br>trade with <em>precision.</em>
+      </h1>
+    </div>
+
+    <p class="brand-tagline">
+      End-to-end visibility across every vessel, port call,<br>
+      and cargo manifest — in one unified platform.
+    </p>
+
+    <div class="stat-strip">
+      <div class="stat">
+        <span class="stat-num">180+</span>
+        <span class="stat-label">Countries</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">12K</span>
+        <span class="stat-label">Vessels tracked</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">99.9%</span>
+        <span class="stat-label">Uptime SLA</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Login card -->
+  <div class="card-wrap">
+    <div class="card">
+
+      <div id="form-section">
+        <p class="card-eyebrow">Secure Portal</p>
+        <h2 class="card-title">Sign in to<br>your account</h2>
+        <p class="card-sub">Authorised personnel only</p>
+
+        <div class="field">
+          <label for="email">Email address</label>
+          <div class="input-wrap">
+            <input type="email" id="email" placeholder="officer@maretide.com" autocomplete="email" />
+            <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <input type="password" id="password" placeholder="••••••••••" autocomplete="current-password" />
+            <svg class="icon" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            <button class="toggle-pw" id="toggle-pw" type="button" aria-label="Show or hide password">
+              <svg id="eye-icon" viewBox="0 0 24 24"><path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <p class="error-msg" id="error-msg">Credentials not recognised. Please try again.</p>
+
+        <div class="extras">
+          <label class="remember">
+            <input type="checkbox" id="remember" />
+            Keep me signed in
+          </label>
+          <a href="#" class="forgot">Reset password</a>
+        </div>
+
+        <button class="btn-signin" id="login-btn" type="button">
+          <span class="btn-label">Sign in</span>
+          <span class="spinner" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          </span>
+        </button>
+
+        <div class="badge-row">
+          <span class="badge">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            256-bit encrypted
+          </span>
+          <span class="badge">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            24/7 monitored
+          </span>
+          <span class="badge">
+            <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            ISO 27001
+          </span>
+        </div>
+      </div>
+
+      <!-- Success -->
+      <div class="success-screen" id="success-screen">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <p class="success-title">Access granted</p>
+        <p class="success-sub">Redirecting to your dashboard…</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>
