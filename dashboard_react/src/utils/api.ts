@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "http://localhost:8010";
+const API_BASE = "http://localhost:8000";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -94,6 +94,25 @@ export const telemetryAPI = {
   }
 };
 
+export const telemetryV2API = {
+  getLive: async () => {
+    const res = await api.get("/api/telemetry/live");
+    return res.data;
+  },
+  getHealth: async () => {
+    const res = await api.get("/api/telemetry/health");
+    return res.data;
+  },
+  getSources: async () => {
+    const res = await api.get("/api/telemetry/sources");
+    return res.data;
+  },
+  selectSource: async (source: "HARDWARE_SENSOR" | "SIMULATED_TELEMETRY", port?: string) => {
+    const res = await api.post("/api/telemetry/source/select", { source, port });
+    return res.data;
+  }
+};
+
 export const visionAPI = {
   getStatus: async () => {
     const res = await api.get("/api/vision/status");
@@ -131,3 +150,125 @@ export const voyageAPI = {
     return res.data;
   }
 };
+
+export const containerAPI = {
+  extract: async (formData: FormData) => {
+    const res = await api.post("/api/container/extract", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return res.data;
+  },
+  analyzeStability: async (payload: any) => {
+    const res = await api.post("/api/container/stability/analyze", payload);
+    return res.data;
+  },
+  confirmAndLoad: async (payload: any) => {
+    const res = await api.post("/api/container/load/confirm", payload);
+    return res.data;
+  },
+  getLoadingAudit: async (limit: number = 100) => {
+    const res = await api.get(`/api/container/load/audit?limit=${limit}`);
+    return res.data;
+  },
+  calculateBallastCompensation: async (payload: any) => {
+    const res = await api.post("/api/container/ballast/calculate", payload);
+    return res.data;
+  },
+  executeBallastCompensation: async (payload: any) => {
+    const res = await api.post("/api/container/ballast/execute", payload);
+    return res.data;
+  },
+  planManifest: async (payload: any) => {
+    const res = await api.post("/api/container/stability/manifest-plan", payload);
+    return res.data;
+  },
+  executeManifest: async (payload: any) => {
+    const res = await api.post("/api/container/manifest/execute", payload);
+    return res.data;
+  }
+};
+
+export const digitalTwinAPI = {
+  getState: async () => {
+    const res = await api.get("/api/digital-twin/state");
+    return res.data;
+  },
+  getLifecycle: async () => {
+    const res = await api.get("/api/digital-twin/lifecycle");
+    return res.data;
+  },
+  getPredictive: async (payload: { container_id: string; gross_weight_t: number; bay: number; side: string; tier?: number }) => {
+    const res = await api.post("/api/digital-twin/predictive", payload);
+    return res.data;
+  }
+};
+
+export const operationsAPI = {
+  getLiveStatus: async () => {
+    const res = await api.get("/api/operations/live-status");
+    return res.data;
+  },
+  resetFlow: async () => {
+    const res = await api.post("/api/operations/reset");
+    return res.data;
+  },
+  getPolicy: async () => {
+    const res = await api.get("/api/operations/policy");
+    return res.data;
+  }
+};
+
+export const workflowAPI = {
+  initiateFromImage: async (formData: FormData) => {
+    const res = await api.post("/api/container/workflow/initiate", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return res.data;
+  },
+  confirmLoad: async (payload: { operation_id: string; operator_id?: string; operator_confirmed?: boolean; override_position?: any }) => {
+    const res = await api.post("/api/container/workflow/confirm-load", payload);
+    return res.data;
+  },
+  confirmBallast: async (payload: { operation_id: string; operator_id?: string; operator_confirmed?: boolean }) => {
+    const res = await api.post("/api/container/workflow/confirm-ballast", payload);
+    return res.data;
+  },
+  approveReview: async (payload: { operation_id: string; operator_id?: string; operator_notes?: string }) => {
+    const res = await api.post("/api/container/workflow/approve-review", payload);
+    return res.data;
+  },
+  reject: async (payload: { operation_id: string; reason: string; operator_id?: string }) => {
+    const res = await api.post("/api/container/workflow/reject", payload);
+    return res.data;
+  },
+  getActiveSession: async () => {
+    const res = await api.get("/api/container/workflow/active");
+    return res.data;
+  },
+  getSession: async (operationId: string) => {
+    const res = await api.get(`/api/container/workflow/session/${operationId}`);
+    return res.data;
+  },
+  getHistory: async (limit: number = 20) => {
+    const res = await api.get(`/api/container/workflow/history?limit=${limit}`);
+    return res.data;
+  },
+  getTimeline: async (operationId: string) => {
+    const res = await api.get(`/api/container/workflow/timeline/${operationId}`);
+    return res.data;
+  },
+  getRecentTimelines: async (limit: number = 20) => {
+    const res = await api.get(`/api/container/workflow/timeline?limit=${limit}`);
+    return res.data;
+  },
+  getAuditEvents: async (limit: number = 100, containerId?: string) => {
+    const params = new URLSearchParams();
+    params.append("limit", limit.toString());
+    if (containerId) params.append("container_id", containerId);
+    const res = await api.get(`/api/container/workflow/events?${params.toString()}`);
+    return res.data;
+  }
+};
+
+
+

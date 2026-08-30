@@ -1,0 +1,114 @@
+{
+  "text_parsing_extraction": {
+    "mean_ms": 0.221,
+    "median_ms": 0.184,
+    "p95_ms": 0.306,
+    "min_ms": 0.177,
+    "max_ms": 1.046,
+    "samples": 50
+  },
+  "image_ocr_processing": {
+    "mean_ms": 2243.266,
+    "median_ms": 2293.026,
+    "p95_ms": 2424.907,
+    "min_ms": 1894.563,
+    "max_ms": 2461.151,
+    "samples": 20
+  },
+  "anomaly_detection": {
+    "mean_ms": 0.006,
+    "median_ms": 0.004,
+    "p95_ms": 0.006,
+    "min_ms": 0.004,
+    "max_ms": 0.057,
+    "samples": 50
+  },
+  "safety_gate_evaluation": {
+    "mean_ms": 0.007,
+    "median_ms": 0.005,
+    "p95_ms": 0.008,
+    "min_ms": 0.005,
+    "max_ms": 0.058,
+    "samples": 50
+  },
+  "stability_optimization": {
+    "mean_ms": 0.343,
+    "median_ms": 0.322,
+    "p95_ms": 0.38,
+    "min_ms": 0.307,
+    "max_ms": 0.996,
+    "samples": 50
+  },
+  "ballast_calculation": {
+    "mean_ms": 0.079,
+    "median_ms": 0.077,
+    "p95_ms": 0.085,
+    "min_ms": 0.073,
+    "max_ms": 0.131,
+    "samples": 50
+  },
+  "telemetry_normalization": {
+    "mean_ms": 0.001,
+    "median_ms": 0.001,
+    "p95_ms": 0.001,
+    "min_ms": 0.001,
+    "max_ms": 0.006,
+    "samples": 50
+  },
+  "digital_twin_refresh": {
+    "mean_ms": 0.045,
+    "median_ms": 0.043,
+    "p95_ms": 0.049,
+    "min_ms": 0.042,
+    "max_ms": 0.093,
+    "samples": 50
+  },
+  "audit_event_logging": {
+    "mean_ms": 5.558,
+    "median_ms": 5.469,
+    "p95_ms": 6.899,
+    "min_ms": 4.039,
+    "max_ms": 7.614,
+    "samples": 50
+  },
+  "audit_timeline_query": {
+    "mean_ms": 0.781,
+    "median_ms": 0.73,
+    "p95_ms": 1.045,
+    "min_ms": 0.687,
+    "max_ms": 1.981,
+    "samples": 50
+  },
+  "complete_workflow_e2e": {
+    "mean_ms": 21.572,
+    "median_ms": 20.833,
+    "p95_ms": 26.814,
+    "min_ms": 17.599,
+    "max_ms": 45.592,
+    "samples": 50
+  },
+  "api_workflow_initiate": {
+    "mean_ms": 4.818,
+    "median_ms": 4.294,
+    "p95_ms": 7.383,
+    "min_ms": 3.813,
+    "max_ms": 12.067,
+    "samples": 50
+  },
+  "api_confirm_loading": {
+    "mean_ms": 16.837,
+    "median_ms": 15.907,
+    "p95_ms": 21.515,
+    "min_ms": 13.284,
+    "max_ms": 35.134,
+    "samples": 50
+  },
+  "api_confirm_ballast": {
+    "mean_ms": 10.51,
+    "median_ms": 10.083,
+    "p95_ms": 15.277,
+    "min_ms": 8.025,
+    "max_ms": 16.231,
+    "samples": 50
+  }
+}

@@ -3,7 +3,7 @@ import { useSocket } from "../context/SocketContext";
 import { SCADADigitalTwin } from "./SCADADigitalTwin";
 import { Inclinometer } from "./Inclinometer";
 import { RecommendationCard } from "./RecommendationCard";
-import { Shield, Anchor, Activity, Scale, Compass } from "lucide-react";
+import { Shield, Droplets, Activity, Scale, Compass } from "lucide-react";
 
 export const DashboardOverview: React.FC = () => {
   const { connected, vesselState } = useSocket();
@@ -32,22 +32,39 @@ export const DashboardOverview: React.FC = () => {
     borderCol = "border-amber-500/30";
   }
 
+  // Total ballast displacement
+  const totalBallastT = Object.values(vesselState.ballast_tanks || {}).reduce(
+    (acc, t) => acc + (t.current_volume || 0), 
+    0
+  );
+
+  const totalCargoT = (vesselState.containers || []).reduce(
+    (acc, c) => acc + (c.weight || 0), 
+    0
+  );
+
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-brand-dark">
       {/* Top Telemetry Connection Status */}
-      <div className="flex items-center justify-between border-b border-brand-border pb-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-brand-border pb-4 gap-3">
         <div>
-          <h2 className="text-xl font-black text-brand-text tracking-wide uppercase">Vessel Telemetry Overview</h2>
-          <p className="text-xs text-brand-muted font-semibold mt-1">Real-time stability monitoring and AI-guided stowage compensation.</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-xl font-black text-brand-text tracking-wide uppercase">Vessel Telemetry Overview</h2>
+            <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+              Provenance: [DOCUMENT AI] + [CALCULATED]
+            </span>
+          </div>
+          <p className="text-xs text-brand-muted font-semibold mt-1">Real-time stability monitoring, hydrostatics, and AI-guided stowage supervisory overview.</p>
         </div>
-        <div className={`flex items-center gap-2 border px-3 py-1.5 rounded-lg ${
+
+        <div className={`flex items-center gap-2 border px-3.5 py-1.5 rounded-xl shadow ${
           connected 
             ? "bg-brand-accentBg border-brand-accent/20 text-brand-accent" 
             : "bg-brand-dangerBg border-brand-danger/20 text-brand-danger"
         }`}>
-          <div className={`w-2 h-2 rounded-full ${connected ? "bg-brand-accent animate-pulse" : "bg-brand-danger"}`} />
+          <div className={`w-2.5 h-2.5 rounded-full ${connected ? "bg-brand-accent animate-pulse" : "bg-brand-danger"}`} />
           <span className="text-[10px] font-black uppercase tracking-wider">
-            {connected ? "IoT Stream Connected" : "Connection Lost"}
+            {connected ? (vesselState.is_simulated ? "Simulated Telemetry Stream" : "Hardware IoT Telemetry") : "Telemetry Disconnected"}
           </span>
         </div>
       </div>
@@ -55,24 +72,30 @@ export const DashboardOverview: React.FC = () => {
       {/* Primary KPIs grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* KPI 1: Stability Score */}
-        <div className={`bg-brand-card border ${borderCol} p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel`}>
+        <div className={`bg-brand-card border ${borderCol} p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel relative overflow-hidden`}>
           <div className={`p-3 ${scoreBg} rounded-xl`}>
             <Shield className={`w-6 h-6 ${scoreCol}`} />
           </div>
-          <div>
-            <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">Stability Index</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">Stability Index</span>
+              <span className="text-[8px] font-extrabold text-blue-400 bg-blue-500/10 px-1 rounded">[CALC]</span>
+            </div>
             <span className={`text-xl font-black ${scoreCol}`}>{score.toFixed(1)}%</span>
             <span className="text-[9px] text-brand-muted font-semibold block mt-0.5 uppercase">Risk: {vesselState.stability_risk}</span>
           </div>
         </div>
 
         {/* KPI 2: Roll Angle */}
-        <div className="bg-brand-card border border-brand-border p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel">
+        <div className="bg-brand-card border border-brand-border p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel relative overflow-hidden">
           <div className="p-3 bg-[#5483B3]/12 rounded-xl">
             <Compass className="w-6 h-6 text-[#5483B3]" />
           </div>
-          <div>
-            <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">List / Roll</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">List / Roll</span>
+              <span className="text-[8px] font-extrabold text-amber-400 bg-amber-500/10 px-1 rounded">[TEL]</span>
+            </div>
             <span className="text-xl font-black text-brand-text">{vesselState.roll.toFixed(2)}°</span>
             <span className="text-[9px] text-brand-muted font-semibold block mt-0.5 uppercase">
               {vesselState.roll > 0 ? "Starboard List" : vesselState.roll < 0 ? "Port List" : "Balanced"}
@@ -80,15 +103,18 @@ export const DashboardOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* KPI 3: Cargo Weight */}
-        <div className="bg-brand-card border border-brand-border p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel">
+        {/* KPI 3: Cargo Stowage Mass */}
+        <div className="bg-brand-card border border-brand-border p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel relative overflow-hidden">
           <div className="p-3 bg-amber-500/12 rounded-xl">
             <Scale className="w-6 h-6 text-amber-500" />
           </div>
-          <div>
-            <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">Total Stowage Weight</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">Document Cargo</span>
+              <span className="text-[8px] font-extrabold text-cyan-400 bg-cyan-500/10 px-1 rounded">[DOC AI]</span>
+            </div>
             <span className="text-xl font-black text-brand-text">
-              {vesselState.containers.reduce((acc, c) => acc + c.weight, 0).toFixed(1)} t
+              {totalCargoT.toFixed(1)} t
             </span>
             <span className="text-[9px] text-brand-muted font-semibold block mt-0.5 uppercase">
               {vesselState.containers.length} Containers Loaded
@@ -96,16 +122,19 @@ export const DashboardOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* KPI 4: Active Scale Weight */}
-        <div className="bg-brand-card border border-brand-border p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel">
-          <div className="p-3 bg-brand-accentBg rounded-xl">
-            <Anchor className="w-6 h-6 text-brand-accent" />
+        {/* KPI 4: Ballast Water Displacement */}
+        <div className="bg-brand-card border border-brand-border p-4 rounded-xl flex items-center gap-4 shadow-md glass-panel relative overflow-hidden">
+          <div className="p-3 bg-cyan-500/12 rounded-xl">
+            <Droplets className="w-6 h-6 text-cyan-400" />
           </div>
-          <div>
-            <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">Active Scale Cargo</span>
-            <span className="text-xl font-black text-brand-text">{vesselState.cargo_t.toFixed(1)} t</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">Ballast Water</span>
+              <span className="text-[8px] font-extrabold text-blue-400 bg-blue-500/10 px-1 rounded">[CALC]</span>
+            </div>
+            <span className="text-xl font-black text-brand-text">{totalBallastT.toFixed(1)} t</span>
             <span className="text-[9px] text-brand-muted font-semibold block mt-0.5 uppercase">
-              Scale Model: {vesselState.cargo_kg.toFixed(2)} kg
+              {Object.keys(vesselState.ballast_tanks || {}).length} Active Tanks
             </span>
           </div>
         </div>
@@ -120,7 +149,6 @@ export const DashboardOverview: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Inclinometer roll={vesselState.roll} pitch={vesselState.pitch} />
         
-        {/* We can fetch recommendations from the state endpoints directly, but passing down basic values is also great */}
         <RecommendationCard 
           bestBay={vesselState.active_rec_bay}
           bestSide={vesselState.active_rec_side}

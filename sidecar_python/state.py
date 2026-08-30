@@ -1,3 +1,9 @@
+"""
+Global State & Telemetry Integration Coordinator for MareTide.
+Connects the decoupled TelemetryManager to the vessel model, Digital Twin,
+and operational flow stage.
+"""
+
 import threading
 import time
 import datetime
@@ -5,6 +11,19 @@ from ship import Ship, BallastTank, Container, StabilityAnalyzer, Recommendation
 from navi_vision.vision_manager import get_global_manager
 from serial_reader import SerialTelemetryReader
 from reports.logs_db import log_ballast_operation, log_cargo_operation
+from container_stability.policy import (
+    CONTAINER_WEIGHT_SOURCE,
+    PROVENANCE_LABEL,
+    ALLOWED_WEIGHT_SOURCES,
+    FORBIDDEN_WEIGHT_SOURCES,
+    DOCUMENT_AI_CARGO_MASS,
+    LOAD_CELL_CARGO_MASS,
+    HARDWARE_TELEMETRY_LABEL,
+    assert_authoritative_source
+)
+from telemetry.manager import TelemetryManager
+from telemetry.models import TelemetrySource, ConnectionStatus
+
 
 # --- SINGLETON STATE ACCESSORS ---
 _ship = None
@@ -16,6 +35,27 @@ _state_lock = threading.Lock()
 iot_flow_stage = "WAITING_FOR_CARGO"
 planned_container = {}
 last_loaded_weight = 0.0
+
+def reset_ship():
+    global _ship
+    with _state_lock:
+        _ship = Ship(name="MareTide Vessel", num_bays=4)
+        for i in range(1, 5):
+            _ship.tanks[f"port_{i}"] = BallastTank(f"Port-{i}", 300, 300)
+            _ship.tanks[f"starboard_{i}"] = BallastTank(f"Starboard-{i}", 300, 300)
+    return _ship
+
+def reset_state():
+    global _ship, iot_flow_stage, planned_container, last_loaded_weight
+    with _state_lock:
+        _ship = Ship(name="MareTide Vessel", num_bays=4)
+        for i in range(1, 5):
+            _ship.tanks[f"port_{i}"] = BallastTank(f"Port-{i}", 300, 300)
+            _ship.tanks[f"starboard_{i}"] = BallastTank(f"Starboard-{i}", 300, 300)
+        iot_flow_stage = "WAITING_FOR_CARGO"
+        planned_container = {}
+        last_loaded_weight = 0.0
+    return _ship
 
 active_rec_bay = 1
 active_rec_side = "port"
@@ -84,7 +124,6 @@ def get_current_reader() -> SerialTelemetryReader:
     global _reader
     with _state_lock:
         if _reader is None:
-            # Initialize with default simulation mode
             _reader = SerialTelemetryReader(is_simulated=True)
             _reader.start()
         return _reader
@@ -104,8 +143,10 @@ def reconnect_reader(port: str, is_simulated: bool):
         
         if is_simulated:
             _reader = SerialTelemetryReader(is_simulated=True)
+            TelemetryManager.get_instance().select_source(TelemetrySource.SIMULATED_TELEMETRY)
         else:
             _reader = SerialTelemetryReader(port=port, is_simulated=False)
+            TelemetryManager.get_instance().select_source(TelemetrySource.HARDWARE_SENSOR, port=port)
         _reader.start()
     return _reader
 
@@ -116,40 +157,21 @@ def process_telemetry_tick(roll_val, pitch_val, cargo_kg_val, distance_val, ball
     global latest_telemetry
 
     ship = get_current_ship()
-    cargo_t = cargo_kg_val * 10.0
     
-    # Store latest telemetry values
+    # Store latest telemetry values (Strict Phase 5 Policy: cargo_kg is always 0.0)
     latest_telemetry = {
         "roll": roll_val,
         "pitch": pitch_val,
         "distance": distance_val,
         "ballast_pct": ballast_pct_val,
-        "cargo_kg": cargo_kg_val,
+        "cargo_kg": 0.0,
         "status": status_val,
         "risk": get_normalized_stability(ship, roll_val, pitch_val)[2]
     }
 
-    # --- STATE TRANSITIONS ---
-    if status_val == "IDLE" or cargo_kg_val < 0.1:
-        iot_flow_stage = "WAITING_FOR_CARGO"
-        planned_container = {}
-        last_loaded_weight = 0.0
-
     current_stage = iot_flow_stage
 
-    if current_stage == "WAITING_FOR_CARGO" and cargo_kg_val >= 0.1:
-        iot_flow_stage = "PLACING_CARGO"
-        current_stage = "PLACING_CARGO"
-
-    if current_stage == "DRAINING":
-        import sys
-        sys.stderr.write(f"[STATE MACHINE] Stage: DRAINING, Status: {status_val}, Distance: {distance_val:.2f}, Planned: {planned_container}\n")
-        sys.stderr.flush()
-        
     if current_stage == "DRAINING" and str(status_val).strip().upper() == "READY":
-        import sys
-        sys.stderr.write(f"[STATE MACHINE] Entering READY transition block. Planned: {planned_container}\n")
-        sys.stderr.flush()
         if planned_container:
             cid = planned_container["id"]
             bay = planned_container["bay"]
@@ -157,7 +179,7 @@ def process_telemetry_tick(roll_val, pitch_val, cargo_kg_val, distance_val, ball
             tier = planned_container["tier"]
             weight_t = planned_container["weight"]
 
-            # Auto-increment tier if slot is occupied (prevents getting stuck)
+            # Auto-increment tier if slot is occupied
             actual_tier = tier
             while ship.slot_occupied(bay, side, actual_tier):
                 actual_tier += 1
@@ -195,8 +217,8 @@ def process_telemetry_tick(roll_val, pitch_val, cargo_kg_val, distance_val, ball
 
             iot_flow_stage = "COMPLETED"
 
-    # --- RECOMMENDATION COMPONENT ---
-    rec_bay, rec_side, rec_score = RecommendationEngine.best_position(ship, cargo_t)
+    # --- RECOMMENDATION COMPONENT (Based on 20t standard reference or planned cargo) ---
+    rec_bay, rec_side, rec_score = RecommendationEngine.best_position(ship, 20.0)
 
     now = time.time()
     if last_rec_bay is None or last_rec_side is None:
@@ -219,22 +241,72 @@ def process_telemetry_tick(roll_val, pitch_val, cargo_kg_val, distance_val, ball
 def run_telemetry_loop():
     while True:
         try:
-            reader = get_current_reader()
-            data = reader.get_telemetry()
+            mgr = TelemetryManager.get_instance()
+            norm = mgr.get_latest_telemetry()
+            
+            # Extract first tank level / distance
+            first_tank = next(iter(norm.ballast_tanks.values()), None)
+            dist_val = first_tank.distance_cm if first_tank else 10.0
+            ballast_val = first_tank.level_pct if first_tank else 100.0
             
             process_telemetry_tick(
-                roll_val=data.get("roll", 0.0),
-                pitch_val=data.get("pitch", 0.0),
-                cargo_kg_val=data.get("cargo_kg", 0.0),
-                distance_val=data.get("distance", 30.0),
-                ballast_pct_val=data.get("ballast_pct", 100.0),
-                status_val=data.get("status", "IDLE"),
-                reader_connected_val=(reader.running and not reader.is_simulated)
+                roll_val=norm.vessel_state.roll_deg,
+                pitch_val=norm.vessel_state.pitch_deg,
+                cargo_kg_val=0.0,  # Zero load-cell coupling
+                distance_val=dist_val,
+                ballast_pct_val=ballast_val,
+                status_val=norm.operational_telemetry.status,
+                reader_connected_val=(norm.source == TelemetrySource.HARDWARE_SENSOR and norm.connection_status == ConnectionStatus.CONNECTED)
             )
         except Exception as e:
-            print(f"Error in telemetry loop tick: {e}")
-            
-        time.sleep(0.1)
+            pass
+        time.sleep(0.05)  # 20 Hz tick with proper sleep
+
+# --- PHASE 5 OPERATIONAL INTEGRATION HELPERS ---
+def get_operational_status():
+    ship = get_current_ship()
+    mgr = TelemetryManager.get_instance()
+    norm = mgr.get_latest_telemetry()
+    legacy_dict = mgr.get_legacy_telemetry_dict()
+    
+    score, label, risk = get_normalized_stability(ship, norm.vessel_state.roll_deg, norm.vessel_state.pitch_deg)
+    
+    total_cargo_t = round(float(ship.total_cargo_weight()), 2)
+    total_ballast_t = round(float(ship.total_ballast_weight()), 2)
+    list_t = round(float(StabilityAnalyzer.calculate_list(ship)), 2)
+    trim_t = round(float(StabilityAnalyzer.calculate_trim(ship)), 2)
+    
+    return {
+        "operational_stage": iot_flow_stage,
+        "ship_name": ship.name,
+        "total_containers": len(ship.containers),
+        "total_cargo_weight_t": total_cargo_t,
+        "total_ballast_weight_t": total_ballast_t,
+        "list_t": list_t,
+        "trim_t": trim_t,
+        "stability_score": round(float(score), 2),
+        "risk_level": risk,
+        "telemetry": legacy_dict,
+        "normalized_telemetry": norm.model_dump(),
+        "telemetry_source": norm.source.value,
+        "connection_status": norm.connection_status.value,
+        "data_quality": norm.metadata.data_quality.value,
+        "authoritative_weight_source": PROVENANCE_LABEL,
+        "container_weight_source": CONTAINER_WEIGHT_SOURCE,
+        "document_ai_cargo_mass": DOCUMENT_AI_CARGO_MASS,
+        "load_cell_cargo_mass": LOAD_CELL_CARGO_MASS,
+        "hardware_telemetry_label": HARDWARE_TELEMETRY_LABEL,
+        "load_cell_policy": "FORBIDDEN_FOR_CARGO_AND_STABILITY"
+    }
+
+
+def reset_operational_stage():
+    global iot_flow_stage, planned_container, last_loaded_weight
+    with _state_lock:
+        iot_flow_stage = "WAITING_FOR_CARGO"
+        planned_container = {}
+        last_loaded_weight = 0.0
+    return True
 
 # Start telemetry integration loop inside daemon thread
 threading.Thread(target=run_telemetry_loop, daemon=True).start()

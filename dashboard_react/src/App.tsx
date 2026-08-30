@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { authAPI } from "./utils/api";
 import { SocketProvider } from "./context/SocketContext";
+import { ContainerOperationProvider } from "./context/ContainerOperationContext";
 import { Sidebar } from "./components/Sidebar";
 import { DashboardOverview } from "./components/DashboardOverview";
 import { LiveMonitor } from "./components/LiveMonitor";
@@ -11,7 +12,11 @@ import { Reports } from "./components/Reports";
 import { HistoryLogs } from "./components/HistoryLogs";
 import { AIVision } from "./components/AIVision";
 import { VoyageIntelligence } from "./components/VoyageIntelligence";
+import { ContainerIntelligence } from "./components/ContainerIntelligence";
+import { HackathonDemoMode } from "./components/HackathonDemoMode";
 import { Settings } from "./components/Settings";
+
+
 import { Activity } from "lucide-react";
 
 export const App: React.FC = () => {
@@ -93,6 +98,11 @@ export const App: React.FC = () => {
     switch (activeTab) {
       case "overview":
         return <DashboardOverview />;
+      case "demo-mode":
+        return <HackathonDemoMode />;
+      case "container-ai":
+        return <ContainerIntelligence />;
+
       case "monitor":
         return <LiveMonitor />;
       case "ballast":
@@ -118,21 +128,23 @@ export const App: React.FC = () => {
 
   return (
     <SocketProvider>
-      <div className="flex h-screen w-screen overflow-hidden bg-brand-dark text-brand-text">
-        {/* Left Sidebar Navigation */}
-        <Sidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          user={user} 
-          theme={theme}
-          setTheme={setTheme}
-        />
+      <ContainerOperationProvider>
+        <div className="flex h-screen w-screen overflow-hidden bg-brand-dark text-brand-text">
+          {/* Left Sidebar Navigation */}
+          <Sidebar 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            user={user} 
+            theme={theme}
+            setTheme={setTheme}
+          />
 
-        {/* Right Tab panel */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {renderTabContent()}
-        </main>
-      </div>
+          {/* Right Tab panel */}
+          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {renderTabContent()}
+          </main>
+        </div>
+      </ContainerOperationProvider>
     </SocketProvider>
   );
 };

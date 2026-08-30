@@ -207,6 +207,7 @@ class VisionManager:
             for feed in self.video_feeds.values():
                 feed.set_source(mode, device_index)
             if self.yolo_runner:
+                self.yolo_runner.set_source("crew_safety", mode, device_index)
                 self.yolo_runner.set_source("sea", mode, device_index)
 
     def get_source_mode(self) -> str:

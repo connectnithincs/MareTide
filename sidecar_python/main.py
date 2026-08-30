@@ -27,6 +27,76 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Container Document Intelligence / OCR Subsystem (Phase 1 & Phase 5 Workflow)
+from container_ocr import container_router, workflow_router
+app.include_router(container_router)
+app.include_router(workflow_router)
+
+# Container Stability & Loading Integration (Phase 2 & Phase 5 Safety Gate)
+from container_stability import stability_router, safety_gate_router
+from container_stability.models import (
+    ContainerStabilityAnalysisRequest,
+    ContainerLoadingConfirmRequest,
+    BallastCompensationRequest,
+    BallastExecutionRequest
+)
+from container_stability.analyzer import (
+    ContainerStabilityService,
+    ContainerLoadingService,
+    ContainerBallastService
+)
+
+app.include_router(stability_router)
+app.include_router(safety_gate_router)
+
+# Route Aliases for frontend convenience (/api/containers/*)
+@app.post("/api/containers/analyze-stability", tags=["Container Stability & Loading Integration"])
+async def analyze_stability_alias(req: ContainerStabilityAnalysisRequest):
+    return ContainerStabilityService.analyze_container_placement(req)
+
+@app.post("/api/containers/confirm-and-load", tags=["Container Stability & Loading Integration"])
+async def confirm_load_alias(req: ContainerLoadingConfirmRequest):
+    return ContainerLoadingService.confirm_and_load(req)
+
+@app.post("/api/containers/ballast-compensation", tags=["Container Stability & Loading Integration"])
+async def ballast_compensation_alias(req: BallastCompensationRequest):
+    return ContainerBallastService.calculate_compensation(req)
+
+@app.post("/api/containers/execute-ballast", tags=["Container Stability & Loading Integration"])
+async def execute_ballast_alias(req: BallastExecutionRequest):
+    return ContainerBallastService.execute_compensation(req)
+
+@app.get("/api/reports/timeline", tags=["Audit & Reports"])
+async def get_timeline_reports_alias(limit: int = 100):
+    from reports.logs_db import get_all_audit_events, get_cargo_operations, get_ballast_operations
+    events = get_all_audit_events(limit=limit)
+    if not events:
+        cargo = get_cargo_operations(limit=limit)
+        ballast = get_ballast_operations(limit=limit)
+        for c in cargo:
+            events.append({
+                "timestamp": c.get("time"),
+                "event": c.get("event", "CARGO_LOADED"),
+                "action": f"Loaded {c.get('container')} ({c.get('weight')}t) to Bay {c.get('bay')}-{c.get('side')}-{c.get('tier')}",
+                "source": c.get("source", "DOCUMENT_AI")
+            })
+        for b in ballast:
+            events.append({
+                "timestamp": b.get("timestamp"),
+                "event": b.get("op_type", "BALLAST_COMPENSATION"),
+                "action": f"Ballast {b.get('pump_mode')} {b.get('qty')}t on {b.get('source') or b.get('dest')}",
+                "source": b.get("trigger", "AI_AUTO_COMPENSATION")
+            })
+        events.sort(key=lambda x: str(x.get("timestamp", "")), reverse=True)
+    return {"status": "success", "timeline": events}
+
+
+# Real-Time Telemetry Integration Subsystem (Phase 5)
+from telemetry.routes import router as telemetry_router
+app.include_router(telemetry_router)
+
+
+
 # Frame encoding helper
 def encode_frame(frame):
     if frame is None:
@@ -52,8 +122,9 @@ def frame_generator(cam_id):
     manager = state.get_vision_manager()
     while True:
         frame = None
-        if cam_id == "sea":
-            frame = manager.get_latest_frame("Sea")
+        if cam_id in ["crew_safety", "sea"]:
+            yolo_key = "Crew Safety" if cam_id == "crew_safety" else "Sea"
+            frame = manager.get_latest_frame(yolo_key)
         else:
             frame = manager.get_camera_frame(cam_id)
             
@@ -121,8 +192,114 @@ async def get_vessel_state():
         "is_pumping": _is_manual_pumping
     }
 
+# --- Phase 4F: Cargo-Aware Digital Twin & Predictive Monitoring Endpoints ---
+from digital_twin import DigitalTwin
+
+@app.get("/api/digital-twin/state")
+async def get_digital_twin_state():
+    ship = state.get_current_ship()
+    telemetry = state.latest_telemetry
+    twin_state = DigitalTwin.get_vessel_twin_snapshot(ship, telemetry)
+    return twin_state.model_dump()
+
+@app.get("/api/digital-twin/lifecycle")
+async def get_digital_twin_lifecycle():
+    ship = state.get_current_ship()
+    lifecycle = DigitalTwin.get_four_stage_lifecycle(current_ship=ship)
+    return lifecycle.model_dump()
+
+@app.post("/api/digital-twin/predictive")
+async def get_predictive_comparison(req: Request):
+    body = await req.json()
+    container_id = body.get("container_id", "PLANNED-CNTR")
+    weight_t = float(body.get("gross_weight_t", 20.0))
+    bay = int(body.get("bay", 1))
+    side = str(body.get("side", "port"))
+    tier = int(body.get("tier", 1))
+    
+    ship = state.get_current_ship()
+    comp = DigitalTwin.get_predictive_comparison(
+        current_ship=ship,
+        container_id=container_id,
+        gross_weight_t=weight_t,
+        bay=bay,
+        side=side,
+        tier=tier
+    )
+    return comp.model_dump()
+# --- Phase 5: Real-Time Operational Integration & Authoritative Cargo Workflow ---
+from container_stability.models import (
+    LiveOperationalStatusResponse,
+    OperationalResetResponse,
+    OperationalPolicyResponse
+)
+
+@app.get(
+    "/api/operations/live-status",
+    response_model=LiveOperationalStatusResponse,
+    summary="Get Real-Time Operational & Supervisory Vessel Status",
+    description="Returns aggregated operational status, live stability metrics, active alarms, telemetry source, and explicit data provenance."
+)
+async def get_live_operational_status():
+    status_data = state.get_operational_status()
+    ship = state.get_current_ship()
+    telemetry = state.latest_telemetry
+    alerts = DigitalTwin.detect_operational_alerts(ship, telemetry)
+    
+    return LiveOperationalStatusResponse(
+        success=True,
+        operational_stage=status_data["operational_stage"],
+        ship_name=status_data["ship_name"],
+        total_containers=status_data["total_containers"],
+        total_cargo_weight_t=status_data["total_cargo_weight_t"],
+        total_ballast_weight_t=status_data["total_ballast_weight_t"],
+        list_t=status_data["list_t"],
+        trim_t=status_data["trim_t"],
+        stability_score=status_data["stability_score"],
+        risk_level=status_data["risk_level"],
+        telemetry=status_data["telemetry"],
+        telemetry_source=status_data["telemetry_source"],
+        authoritative_weight_source=status_data["authoritative_weight_source"],
+        load_cell_policy=status_data["load_cell_policy"],
+        active_alerts=alerts
+    )
+
+@app.get(
+    "/api/operations/status",
+    response_model=LiveOperationalStatusResponse,
+    summary="Get Operational Status (Alias)",
+    description="Alias for /api/operations/live-status."
+)
+async def get_operational_status_alias():
+    return await get_live_operational_status()
+
+
+@app.post(
+    "/api/operations/reset",
+    response_model=OperationalResetResponse,
+    summary="Reset Operational Staging Flow",
+    description="Resets active staging variables for subsequent container workflows while preserving committed vessel state."
+)
+async def reset_operational_flow():
+    state.reset_operational_stage()
+    return OperationalResetResponse(
+        success=True,
+        stage="WAITING_FOR_CARGO",
+        message="Operational staging workflow reset. Committed vessel state preserved."
+    )
+
+@app.get(
+    "/api/operations/policy",
+    response_model=OperationalPolicyResponse,
+    summary="Get Phase 5 Authoritative Data Policy",
+    description="Returns explicit classification of authoritative, non-authoritative, and forbidden data sources."
+)
+async def get_operational_policy():
+    return OperationalPolicyResponse()
+
 @app.post("/api/ballast/calculate-compensation")
 async def calculate_compensation(req: Request):
+    from container_stability.policy import validate_cargo_mass_provenance, CONTAINER_WEIGHT_SOURCE
     body = await req.json()
     planned_id = body.get("id", "").strip()
     bay = int(body.get("bay", 1))
@@ -132,8 +309,22 @@ async def calculate_compensation(req: Request):
     if not planned_id:
         raise HTTPException(status_code=400, detail="Container ID cannot be empty")
         
-    cargo_kg = state.latest_telemetry["cargo_kg"]
-    cargo_t = cargo_kg * 10.0
+    # Enforce Document AI provenance - Load-cell input strictly forbidden
+    source = body.get("weight_source") or body.get("source") or CONTAINER_WEIGHT_SOURCE
+    try:
+        validate_cargo_mass_provenance(source=source, authoritative=body.get("authoritative", True))
+    except ValueError as pe:
+        raise HTTPException(status_code=400, detail=f"Security Policy Violation: {str(pe)}")
+
+    # Cargo mass originates exclusively from Document AI / Container JSON
+    if "gross_weight_t" in body and body["gross_weight_t"] is not None:
+        cargo_t = float(body["gross_weight_t"])
+    elif "gross_weight_kg" in body and body["gross_weight_kg"] is not None:
+        cargo_t = round(float(body["gross_weight_kg"]) / 1000.0, 2)
+    elif "weight" in body and body["weight"] is not None:
+        cargo_t = float(body["weight"])
+    else:
+        cargo_t = 0.0
     
     ship = state.get_current_ship()
     already_loaded = sum(c.weight for c in ship.containers if c.bay == bay and c.side.lower() == side.lower())
@@ -159,9 +350,9 @@ async def calculate_compensation(req: Request):
 
 @app.post("/api/ballast/confirm-drain")
 async def confirm_drain():
-    cargo_kg = state.latest_telemetry["cargo_kg"]
+    cargo_t = state.planned_container.get("weight", 0.0)
     reader = state.get_current_reader()
-    reader.send_drain_command(cargo_kg)
+    reader.send_drain_command(cargo_t / 10.0 if cargo_t > 0 else 0.0)
     state.iot_flow_stage = "DRAINING"
     return {"success": True, "stage": state.iot_flow_stage}
 
@@ -172,6 +363,7 @@ async def clear_scale():
     state.iot_flow_stage = "WAITING_FOR_CARGO"
     state.planned_container = {}
     return {"success": True, "stage": state.iot_flow_stage}
+
 
 @app.post("/api/ballast/adjust")
 async def ballast_adjust(req: Request):
@@ -503,8 +695,8 @@ def generate_explainable_ai_recs(ship, list_v, trim_v, roll, pitch, risk_label, 
 async def get_recommendations():
     from ship import StabilityAnalyzer, RecommendationEngine
     ship = state.get_current_ship()
-    cargo_kg = state.latest_telemetry["cargo_kg"]
-    cargo_t = cargo_kg * 10.0
+    # Cargo weight originates strictly from Document AI planned container, not load-cell telemetry
+    cargo_t = float(state.planned_container.get("weight", 0.0))
     rec_bay, rec_side, rec_score = RecommendationEngine.best_position(ship, cargo_t)
     
     # Calculate explainable recommendations
@@ -523,6 +715,7 @@ async def get_recommendations():
         "best_score": rec_score,
         "explainable_recs": explainable
     }
+
 
 @app.get("/api/deck-plan")
 async def get_deck_plan():
@@ -684,7 +877,7 @@ async def voyage_track(imo: str):
 
 @app.get("/api/video/{camera_id}")
 async def video_stream(camera_id: str):
-    valid_ids = ["sea", "cargo", "ballast"]
+    valid_ids = ["crew_safety", "sea", "cargo", "ballast"]
     if camera_id not in valid_ids:
         raise HTTPException(status_code=400, detail="Invalid camera feed ID")
     return StreamingResponse(

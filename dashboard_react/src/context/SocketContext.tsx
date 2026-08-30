@@ -37,8 +37,27 @@ export interface VesselState {
     bay: number;
     side: string;
     tier: number;
+    provenance?: string;
   }>;
   is_pumping?: boolean;
+  telemetry_timestamp?: string;
+  telemetry_freshness?: "FRESH" | "STALE" | "DEGRADED" | "DISCONNECTED" | string;
+  stale_seconds?: number;
+  connection_status?: "CONNECTED" | "DISCONNECTED" | "STALE" | "DEGRADED" | "SIMULATED" | string;
+  pump_state?: string;
+  pump_flow_l_s?: number;
+  pump_active?: boolean;
+  provenance_map?: Record<string, string>;
+  telemetry_source?: string;
+  authoritative_weight_source?: string;
+  alerts?: Array<{
+    alert_type: string;
+    severity: "INFO" | "WARNING" | "CRITICAL";
+    threshold: string;
+    observed_value: number;
+    message: string;
+    action: string;
+  }>;
 }
 
 interface SocketContextProps {
@@ -63,7 +82,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const connect = () => {
       console.log("Connecting to telemetry WebSocket...");
-      const ws = new WebSocket("ws://localhost:8010/ws/telemetry");
+      const ws = new WebSocket("ws://localhost:8000/ws/telemetry");
       wsRef.current = ws;
 
       ws.onopen = () => {

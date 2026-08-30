@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import axios from "axios";
 
 const app = express();
-const port = 8010;
+const port = 8000;
 
 app.use(cors({
   origin: true,
@@ -59,17 +59,22 @@ setInterval(async () => {
 const forwardTo = (targetBaseUrl) => async (req, res) => {
   const url = `${targetBaseUrl}${req.originalUrl}`;
   try {
+    const isMultipart = (req.headers['content-type'] || '').includes('multipart/form-data');
     const config = {
       method: req.method,
       url: url,
-      data: req.body,
-      headers: { ...req.headers }
+      data: isMultipart ? req : req.body,
+      headers: { ...req.headers },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity
     };
-    // Delete host, origin, and payload-length headers to prevent proxy validation failures
+    // Delete host, origin, and problematic proxy headers
     delete config.headers.host;
     delete config.headers.origin;
-    delete config.headers['content-length'];
-    delete config.headers['Content-Length'];
+    if (!isMultipart) {
+      delete config.headers['content-length'];
+      delete config.headers['Content-Length'];
+    }
     delete config.headers['connection'];
     delete config.headers['Connection'];
     delete config.headers['transfer-encoding'];
@@ -126,6 +131,9 @@ app.all("/api/reports/*", forwardTo(SIDECAR_URL));
 app.all("/api/telemetry/*", forwardTo(SIDECAR_URL));
 app.all("/api/vision/*", forwardTo(SIDECAR_URL));
 app.all("/api/voyage/*", forwardTo(SIDECAR_URL));
+app.all("/api/container/*", forwardTo(SIDECAR_URL));
+app.all("/api/digital-twin/*", forwardTo(SIDECAR_URL));
+app.all("/api/operations/*", forwardTo(SIDECAR_URL));
 
 // Server Boot
 server.listen(port, "0.0.0.0", () => {

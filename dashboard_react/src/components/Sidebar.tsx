@@ -12,6 +12,7 @@ import {
   Settings as SettingsIcon, 
   LogOut, 
   Anchor,
+  Sparkles,
   Sun,
   Moon
 } from "lucide-react";
@@ -27,6 +28,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, theme, setTheme }) => {
   const menuItems = [
     { id: "overview", name: "Dashboard Overview", icon: LayoutDashboard },
+    { id: "demo-mode", name: "Hackathon Demo Mode", icon: Sparkles, badge: "DEMO" },
+    { id: "container-ai", name: "Container Slip AI", icon: FileSpreadsheet },
     { id: "monitor", name: "Live Monitor", icon: Radio },
     { id: "ballast", name: "Ballast Control", icon: Droplets },
     { id: "deck", name: "Deck View", icon: Grid },
@@ -37,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user,
     { id: "voyage", name: "Voyage Intelligence", icon: Compass },
     { id: "settings", name: "Settings", icon: SettingsIcon }
   ];
+
 
   const handleLogout = () => {
     window.location.href = "http://localhost:5000/logout";

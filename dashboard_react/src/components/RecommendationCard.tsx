@@ -40,9 +40,10 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
           <div>
             <h4 className="text-xs font-bold text-brand-text">Optimal Placement Suggested</h4>
             <p className="text-[11px] text-brand-muted mt-1 leading-relaxed">
-              Place the active scale cargo in <strong className="text-brand-accent uppercase">Bay {bestBay} ({bestSide})</strong>. 
+              Place the planned container cargo in <strong className="text-brand-accent uppercase">Bay {bestBay} ({bestSide})</strong>. 
               This coordinates with automated compensation, yielding a projected stability index of <strong>{bestScore.toFixed(1)}%</strong>.
             </p>
+
           </div>
         </div>
       ) : (
