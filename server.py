@@ -30,8 +30,6 @@ CREDENTIALS = {
 def index():
     if request.headers.get("User-Agent") == "MareTide Poller":
         return "Flask Auth Server Ready"
-    
-    # Respect the configuration flag for automatic login
     if AUTO_LOGIN_IF_SESSION_EXISTS and 'user' in session:
         token = str(uuid.uuid4())
         valid_tokens[token] = {
@@ -39,7 +37,6 @@ def index():
             "expires": time.time() + 60
         }
         return redirect(f"http://localhost:3000/?token={token}")
-        
     return render_template('login.html')
 
 @app.route('/login', methods=['POST'])
@@ -53,7 +50,7 @@ def login():
         session.permanent = True
         session['user'] = email
 
-        # Generate a single-use token for the Streamlit dashboard redirect
+        # Generate a token for the dashboard redirect
         token = str(uuid.uuid4())
         valid_tokens[token] = {
             "user": email,
@@ -75,7 +72,7 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-# --- API Endpoints for Streamlit Handshake ---
+# --- API Endpoints for Handshake ---
 
 @app.route('/api/validate_token')
 def validate_token():
@@ -87,8 +84,6 @@ def validate_token():
     if token_data:
         # Check token expiration
         if time.time() <= token_data['expires']:
-            # Single-use: remove after validation
-            del valid_tokens[token]
             return jsonify({
                 "valid": True,
                 "user": token_data['user']
@@ -110,4 +105,4 @@ def check_session():
     return jsonify({"authenticated": False})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)

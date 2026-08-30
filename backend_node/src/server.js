@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import axios from "axios";
 
 const app = express();
-const port = 8010;
+const port = 8000;
 
 app.use(cors({
   origin: true,
@@ -59,17 +59,33 @@ setInterval(async () => {
 const forwardTo = (targetBaseUrl) => async (req, res) => {
   const url = `${targetBaseUrl}${req.originalUrl}`;
   try {
+    const isMultipart = (req.headers['content-type'] || '').includes('multipart/form-data');
+    let reqData = req.body;
+
+    if (isMultipart) {
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      reqData = Buffer.concat(chunks);
+    }
+
     const config = {
       method: req.method,
       url: url,
-      data: req.body,
-      headers: { ...req.headers }
+      data: reqData,
+      headers: { ...req.headers },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity
     };
-    // Delete host, origin, and payload-length headers to prevent proxy validation failures
+    // Delete host, origin, and problematic proxy headers
     delete config.headers.host;
     delete config.headers.origin;
-    delete config.headers['content-length'];
-    delete config.headers['Content-Length'];
+
+    if (!isMultipart) {
+      delete config.headers['content-length'];
+      delete config.headers['Content-Length'];
+    }
     delete config.headers['connection'];
     delete config.headers['Connection'];
     delete config.headers['transfer-encoding'];
@@ -118,6 +134,8 @@ app.get("/api/auth/session", async (req, res) => {
 });
 
 // Proxy all other calculations, telemetry, loading flow controls and logs to FastAPI Sidecar
+app.all("/health", forwardTo(SIDECAR_URL));
+app.all("/api/health", forwardTo(SIDECAR_URL));
 app.all("/api/vessel-state", forwardTo(SIDECAR_URL));
 app.all("/api/ballast/*", forwardTo(SIDECAR_URL));
 app.all("/api/recommendations", forwardTo(SIDECAR_URL));
@@ -125,7 +143,13 @@ app.all("/api/deck-plan", forwardTo(SIDECAR_URL));
 app.all("/api/reports/*", forwardTo(SIDECAR_URL));
 app.all("/api/telemetry/*", forwardTo(SIDECAR_URL));
 app.all("/api/vision/*", forwardTo(SIDECAR_URL));
+app.all("/api/video/*", forwardTo(SIDECAR_URL));
 app.all("/api/voyage/*", forwardTo(SIDECAR_URL));
+app.all("/api/container/*", forwardTo(SIDECAR_URL));
+app.all("/api/containers/*", forwardTo(SIDECAR_URL));
+app.all("/api/safety-gate/*", forwardTo(SIDECAR_URL));
+app.all("/api/digital-twin/*", forwardTo(SIDECAR_URL));
+app.all("/api/operations/*", forwardTo(SIDECAR_URL));
 
 // Server Boot
 server.listen(port, "0.0.0.0", () => {

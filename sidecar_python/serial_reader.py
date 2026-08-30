@@ -112,6 +112,7 @@ class SerialTelemetryReader:
             self._run_serial()
 
     def _run_serial(self):
+        from telemetry.adapters.hardware_adapter import extract_json_from_buffer
         ser = None
         try:
             ser = serial.Serial(self.port, self.baudrate, timeout=1.0)
@@ -124,21 +125,18 @@ class SerialTelemetryReader:
                     data = ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
                     buffer += data
                     
-                    # Split lines by newline and parse complete JSON blocks
-                    while "\n" in buffer:
-                        line, buffer = buffer.split("\n", 1)
-                        line = line.strip()
-                        
-                        # Match JSON bracket boundaries
-                        if line.startswith("{") and line.endswith("}"):
-                            try:
-                                parsed = json.loads(line)
-                                with self.lock:
-                                    for key in self.telemetry:
-                                        if key in parsed:
-                                            self.telemetry[key] = parsed[key]
-                            except json.JSONDecodeError:
-                                pass # Partial or malformed JSON line
+                    # Extract complete JSON blocks (handling multi-line formatted JSON and delimiters)
+                    packets, buffer = extract_json_from_buffer(buffer)
+                    for parsed in packets:
+                        with self.lock:
+                            for key in self.telemetry:
+                                if key in parsed:
+                                    # STRICT MARITIME SAFETY INVARIANT:
+                                    # Load-cell readings (cargo_kg) must NOT become container cargo weight.
+                                    # Cargo weight is strictly derived from Document AI.
+                                    if key == "cargo_kg":
+                                        continue
+                                    self.telemetry[key] = parsed[key]
                 time.sleep(0.05)
         except Exception as e:
             with self.lock:

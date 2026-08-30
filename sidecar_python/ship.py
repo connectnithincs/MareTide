@@ -59,7 +59,7 @@ class Ship:
     # ------------------------------------------------------------------
     def slot_occupied(self, bay: int, side: str, tier: int = 1) -> bool:
         return any(
-            c.bay == bay and c.side == side and c.tier == tier
+            c.bay == bay and str(c.side).strip().lower() == str(side).strip().lower() and c.tier == tier
             for c in self.containers
         )
 
@@ -258,20 +258,32 @@ class RecommendationEngine:
         best_side  = None
         best_score = float("inf")
 
+        # Snapshot current containers for thread-safety
+        current_containers = list(ship.containers)
+
         for bay in range(1, ship.num_bays + 1):
             for side in ("port", "starboard"):
 
                 # Skip occupied slots
-                if ship.slot_occupied(bay, side):
+                if any(c.bay == bay and c.side == side for c in current_containers):
                     continue
 
-                # Temporarily add container
-                temp = Container(id="__temp__", weight=weight, bay=bay, side=side)
-                ship.containers.append(temp)
+                # Evaluate candidate with virtual container without mutating ship.containers
+                temp_containers = current_containers + [Container(id="__temp__", weight=weight, bay=bay, side=side)]
+                p_cargo = sum(c.weight for c in temp_containers if c.side.lower() == "port")
+                s_cargo = sum(c.weight for c in temp_containers if c.side.lower() == "starboard")
+                p_total = p_cargo + ship.ballast_port()
+                s_total = s_cargo + ship.ballast_starboard()
+                list_val = s_total - p_total
 
-                score = StabilityAnalyzer.stability_score(ship)
+                midpoint = ship.num_bays / 2
+                fore_cargo = sum(c.weight for c in temp_containers if c.bay <= midpoint)
+                aft_cargo  = sum(c.weight for c in temp_containers if c.bay > midpoint)
+                fore_ballast = sum(t.current_volume for k, t in ship.tanks.items() if int(k.split("_")[1]) <= midpoint)
+                aft_ballast = sum(t.current_volume for k, t in ship.tanks.items() if int(k.split("_")[1]) > midpoint)
+                trim_val = (aft_cargo + aft_ballast) - (fore_cargo + fore_ballast)
 
-                ship.containers.pop()
+                score = abs(list_val) + abs(trim_val)
 
                 if score < best_score:
                     best_score = score

@@ -2,51 +2,275 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg-dark: #EAF4FF;
-  --bg-card: #ffffff;
-  --bg-app: rgba(193, 232, 255, 0.25);
-  --border-brand: rgba(125, 160, 202, 0.25);
-  --text-brand: #021024;
-  --text-muted: #3D5A80;
-  --accent: #10b981;
-  --accent-bg: rgba(16, 185, 129, 0.08);
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.08);
-  --scrollbar-track: #EAF4FF;
-  --scrollbar-thumb: #7DA0CA;
+/* ==========================================================================
+   MARETIDE DESIGN SYSTEM TOKENS — LIGHT & DARK MODE
+   ========================================================================== */
+
+:root, .light {
+  /* Surface Layers (Light Mode — Crisp Nautical Pearl & Frosted Glass) */
+  --bg-abyss: #F0F4F8;
+  --bg-dark: #E4ECF4;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-surface: rgba(235, 243, 252, 0.85);
+  --bg-elevated: rgba(255, 255, 255, 0.98);
+  --bg-hover: rgba(220, 235, 250, 0.95);
+
+  /* Specular Highlights & Borders */
+  --border-subtle: rgba(160, 185, 215, 0.45);
+  --border-brand: rgba(100, 150, 210, 0.55);
+  --glass-glow: rgba(0, 151, 167, 0.15);
+
+  /* Typography */
+  --text-brand: #0A192F;
+  --text-secondary: #2C4258;
+  --text-muted: #55708C;
+
+  /* Semantic State Accents */
+  --accent: #00838F;
+  --accent-bg: rgba(0, 131, 143, 0.12);
+  --safe: #059669;
+  --safe-bg: rgba(5, 150, 105, 0.12);
+  --warning: #D97706;
+  --warning-bg: rgba(217, 119, 6, 0.12);
+  --danger: #DC2626;
+  --danger-bg: rgba(220, 38, 38, 0.12);
+  --cyan: #0284C7;
+  --cyan-bg: rgba(2, 132, 199, 0.12);
+  --purple: #7C3AED;
+  --purple-bg: rgba(124, 58, 237, 0.12);
+  --info: #0284C7;
+  --info-bg: rgba(2, 132, 199, 0.12);
+
+  /* Shadows */
+  --shadow-glass: 0 8px 30px 0 rgba(20, 45, 80, 0.08);
+  --shadow-glass-glow: 0 0 25px -5px rgba(2, 132, 199, 0.20);
+  --shadow-glass-inset: inset 0 1px 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-elevation-1: 0 1px 3px 0 rgba(10, 25, 50, 0.06), 0 1px 2px 0 rgba(10, 25, 50, 0.04);
+  --shadow-elevation-2: 0 4px 16px -2px rgba(10, 25, 50, 0.10), 0 2px 6px -2px rgba(10, 25, 50, 0.06);
+
+  /* Scrollbars */
+  --scrollbar-track: #F0F4F8;
+  --scrollbar-thumb: #94A3B8;
 }
 
 .dark {
-  --bg-dark: #021024;
-  --bg-card: #052659;
-  --bg-app: rgba(193, 232, 255, 0.06);
-  --border-brand: rgba(125, 160, 202, 0.25);
-  --text-brand: #C1E8FF;
-  --text-muted: #7DA0CA;
-  --accent: #10b981;
-  --accent-bg: rgba(16, 185, 129, 0.15);
-  --danger: #E7594B;
-  --danger-bg: rgba(231, 89, 75, 0.15);
-  --scrollbar-track: #021024;
-  --scrollbar-thumb: #052659;
+  /* Surface Layers (Dark Mode — Deep Oceanic SCADA & Liquid Glass) */
+  --bg-abyss: #030914;
+  --bg-dark: rgba(6, 18, 38, 0.90);
+  --bg-card: rgba(10, 30, 60, 0.65);
+  --bg-surface: rgba(15, 42, 82, 0.50);
+  --bg-elevated: rgba(22, 58, 108, 0.70);
+  --bg-hover: rgba(30, 75, 135, 0.80);
+
+  /* Specular Highlights & Borders */
+  --border-subtle: rgba(140, 190, 250, 0.16);
+  --border-brand: rgba(140, 190, 250, 0.32);
+  --glass-glow: rgba(0, 229, 255, 0.18);
+
+  /* Typography */
+  --text-brand: #F2F7FC;
+  --text-secondary: #9BB5D6;
+  --text-muted: #6B89AD;
+
+  /* Semantic State Accents */
+  --accent: #00E5FF;
+  --accent-bg: rgba(0, 229, 255, 0.12);
+  --safe: #00E676;
+  --safe-bg: rgba(0, 230, 118, 0.12);
+  --warning: #FFB300;
+  --warning-bg: rgba(255, 179, 0, 0.12);
+  --danger: #FF3D71;
+  --danger-bg: rgba(255, 61, 113, 0.14);
+  --cyan: #00E5FF;
+  --cyan-bg: rgba(0, 229, 255, 0.12);
+  --purple: #D500F9;
+  --purple-bg: rgba(213, 0, 249, 0.12);
+  --info: #38BDF8;
+  --info-bg: rgba(56, 189, 248, 0.12);
+
+  /* Shadows */
+  --shadow-glass: 0 8px 32px 0 rgba(0, 8, 20, 0.45);
+  --shadow-glass-glow: 0 0 25px -5px rgba(0, 229, 255, 0.25);
+  --shadow-glass-inset: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-elevation-1: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-elevation-2: 0 8px 24px -4px rgba(0, 5, 15, 0.6), 0 4px 12px -2px rgba(0, 5, 15, 0.4);
+
+  /* Scrollbars */
+  --scrollbar-track: #030914;
+  --scrollbar-thumb: #143560;
 }
 
 @layer base {
   body {
-    @apply bg-brand-dark text-brand-text font-sans antialiased;
-    background:
-      radial-gradient(circle at 15% 10%, rgba(193, 232, 255, 0.6), transparent 40%),
-      var(--bg-dark);
+    @apply bg-brand-abyss text-brand-text font-sans antialiased;
     margin: 0;
+    overflow: hidden;
+  }
+
+  .dark body {
+    background-image: 
+      radial-gradient(ellipse at 15% 15%, rgba(0, 229, 255, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse at 85% 85%, rgba(14, 46, 92, 0.25) 0%, transparent 70%);
+  }
+
+  .light body {
+    background-image: 
+      radial-gradient(ellipse at 20% 20%, rgba(2, 132, 199, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 80%, rgba(180, 210, 240, 0.25) 0%, transparent 70%);
+  }
+
+  ::selection {
+    background-color: var(--accent-bg);
+    color: var(--accent);
   }
 }
 
-.bg-sidebar-gradient {
-  background: linear-gradient(180deg, #021024 0%, #052659 100%);
+/* ==========================================================================
+   FLUID THEME TRANSITION CONTROLS
+   ========================================================================== */
+
+body, 
+.glass-panel, 
+.glass-card, 
+.glass-elevated, 
+.scada-panel, 
+.scada-card, 
+.scada-elevated,
+.surface-base,
+.surface-elevated,
+header,
+aside,
+main,
+nav,
+button,
+input,
+select {
+  transition: 
+    background-color 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Custom premium scrollbar styling */
+/* ==========================================================================
+   GLASSMORPHIC & ELEVATION UTILITIES
+   ========================================================================== */
+
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-brand);
+  border-radius: 14px;
+  box-shadow: var(--shadow-glass);
+}
+
+.glass-card {
+  background: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-elevation-1);
+}
+
+.glass-elevated {
+  background: var(--bg-elevated);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-brand);
+  border-radius: 14px;
+  box-shadow: var(--shadow-elevation-2);
+}
+
+.scada-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-brand);
+  border-radius: 14px;
+  box-shadow: var(--shadow-glass);
+}
+
+.scada-card {
+  background: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.scada-elevated {
+  background: var(--bg-elevated);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--border-brand);
+  border-radius: 12px;
+  box-shadow: var(--shadow-elevation-2);
+}
+
+.surface-base {
+  background-color: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--border-subtle);
+  color: var(--text-brand);
+}
+
+.surface-elevated {
+  background-color: var(--bg-elevated);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: var(--border-brand);
+  border-radius: 14px;
+  box-shadow: var(--shadow-elevation-1);
+}
+
+
+/* ==========================================================================
+   TYPOGRAPHY TOKENS
+   ========================================================================== */
+
+.type-page-title {
+  @apply font-mono text-sm sm:text-base font-black uppercase tracking-widest text-brand-text;
+}
+
+.type-section-title {
+  @apply font-mono text-xs font-black uppercase tracking-wider text-brand-text;
+}
+
+.type-card-title {
+  @apply font-mono text-[10px] sm:text-[10.5px] font-bold uppercase tracking-wider text-brand-muted;
+}
+
+.type-kpi-value {
+  @apply font-mono text-xl sm:text-2xl font-black tracking-tight text-brand-text;
+}
+
+.type-kpi-unit {
+  @apply font-mono text-xs font-bold text-brand-muted;
+}
+
+.type-body {
+  @apply font-sans text-xs font-normal text-brand-text leading-relaxed;
+}
+
+.type-caption {
+  @apply font-sans text-[11px] font-medium text-brand-muted leading-tight;
+}
+
+.type-telemetry {
+  @apply font-mono text-xs font-bold text-brand-text tracking-tight;
+}
+
+.type-code {
+  @apply font-mono text-[11px] text-brand-cyan;
+}
+
+/* ==========================================================================
+   SCROLLBAR & ACCESSIBILITY
+   ========================================================================== */
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -65,19 +289,57 @@
   background: var(--border-brand);
 }
 
-/* Custom utility panels */
-.glass-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border-brand);
-  border-radius: 26px;
-  box-shadow: 0 30px 60px -30px rgba(2, 16, 36, 0.25);
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
-.glow-accent {
-  box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+.page-enter {
+  animation: scadaFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.glow-danger {
-  box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+.scada-btn-primary {
+  @apply transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+}
+
+.scada-btn-secondary {
+  @apply transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+}
+
+@keyframes scadaFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Strictly Respect Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  body, 
+  .glass-panel, 
+  .glass-card, 
+  .glass-elevated, 
+  .scada-panel, 
+  .scada-card, 
+  .scada-elevated,
+  header,
+  aside,
+  main,
+  nav,
+  button,
+  input,
+  select,
+  *, ::before, ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

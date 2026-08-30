@@ -6,12 +6,17 @@
 # Caches and builds
 **/__pycache__/
 **/*.pyc
+**/.pytest_cache/
 **/dist/
 **/.system_generated/
 **/.idea/
 **/.vscode/
 **/.DS_Store
 
+# Logs
+**/*.log
+
 # Databases
 **/*.db
 **/*.db-journal
+
