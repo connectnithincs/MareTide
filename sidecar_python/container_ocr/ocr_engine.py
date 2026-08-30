@@ -68,9 +68,10 @@ class RapidOCREngine(BaseOCREngine):
 
         try:
             from rapidocr_onnxruntime import RapidOCR
-            RapidOCREngine._shared_rapidocr = RapidOCR()
+            RapidOCREngine._shared_rapidocr = RapidOCR(use_angle_cls=False)
             self.engine = RapidOCREngine._shared_rapidocr
         except ImportError as e:
+
             raise ImportError(
                 "rapidocr_onnxruntime is not installed. Please install via: pip install rapidocr-onnxruntime"
             ) from e

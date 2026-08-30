@@ -2,38 +2,19 @@ import React, { useEffect, useState } from "react";
 import { authAPI } from "./utils/api";
 import { SocketProvider } from "./context/SocketContext";
 import { ContainerOperationProvider } from "./context/ContainerOperationContext";
-import { Sidebar } from "./components/Sidebar";
-import { DashboardOverview } from "./components/DashboardOverview";
-import { LiveMonitor } from "./components/LiveMonitor";
-import { BallastControl } from "./components/BallastControl";
-import { DeckView } from "./components/DeckView";
-import { AIAdvisor } from "./components/AIAdvisor";
-import { Reports } from "./components/Reports";
-import { HistoryLogs } from "./components/HistoryLogs";
-import { AIVision } from "./components/AIVision";
-import { VoyageIntelligence } from "./components/VoyageIntelligence";
-import { ContainerIntelligence } from "./components/ContainerIntelligence";
-import { HackathonDemoMode } from "./components/HackathonDemoMode";
-import { Settings } from "./components/Settings";
-
-
+import { ThemeProvider } from "./context/ThemeContext";
+import { AppShell } from "./components/layout/AppShell";
+import { LiveMonitorView } from "./components/pages/LiveMonitorView";
+import { VesselDigitalTwinView } from "./components/pages/VesselDigitalTwinView";
+import { MultiContainerPlannerView } from "./components/MultiContainerPlannerView";
+import { OperationsAuditView } from "./components/pages/OperationsAuditView";
 import { Activity } from "lucide-react";
 
 export const App: React.FC = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  }, [theme]);
+  const [activeTab, setActiveTab] = useState("monitor");
 
   useEffect(() => {
     const authenticate = async () => {
@@ -45,10 +26,9 @@ export const App: React.FC = () => {
         if (token) {
           console.log("Token detected in URL. Initiating exchange handshake...");
           const res = await authAPI.exchangeToken(token);
-          if (res.valid) {
+          if (res.valid || res.success) {
             setAuthenticated(true);
-            setUser(res.user);
-            // Clear URL query parameters cleanly
+            setUser(res.user || "admin@maretide.com");
             window.history.replaceState({}, document.title, window.location.pathname);
             setLoading(false);
             return;
@@ -63,7 +43,7 @@ export const App: React.FC = () => {
         const res = await authAPI.checkSession();
         if (res.authenticated) {
           setAuthenticated(true);
-          setUser(res.user);
+          setUser(res.user || "admin@maretide.com");
           setLoading(false);
         } else {
           // Bypass redirect and log in as default local user
@@ -73,7 +53,6 @@ export const App: React.FC = () => {
           setLoading(false);
         }
       } catch (err) {
-        // Fallback mock login on backend service connection errors
         console.log("Auth connection failed. Activating offline local mock login...");
         setAuthenticated(true);
         setUser("admin@maretide.com");
@@ -86,66 +65,64 @@ export const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-brand-dark text-brand-text">
-        <Activity className="w-12 h-12 text-brand-accent animate-spin mb-4" />
-        <h2 className="font-bold text-sm uppercase tracking-widest animate-pulse">Establishing Secure Session Handshake...</h2>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-brand-abyss text-brand-text">
+        <Activity className="w-10 h-10 text-brand-cyan animate-spin mb-3" />
+        <h2 className="font-mono font-bold text-xs uppercase tracking-widest text-brand-muted animate-pulse">
+          Establishing Secure Session Handshake...
+        </h2>
       </div>
     );
   }
 
-  // Active view switcher
+  // Active view switcher (4 Core Supervisory Stations with legacy fallback mappings)
   const renderTabContent = () => {
     switch (activeTab) {
-      case "overview":
-        return <DashboardOverview />;
-      case "demo-mode":
-        return <HackathonDemoMode />;
-      case "container-ai":
-        return <ContainerIntelligence />;
-
       case "monitor":
-        return <LiveMonitor />;
-      case "ballast":
-        return <BallastControl />;
-      case "deck":
-        return <DeckView />;
+      case "command":
+      case "cargo":
+      case "overview":
       case "advisor":
-        return <AIAdvisor />;
-      case "reports":
-        return <Reports />;
-      case "history":
-        return <HistoryLogs />;
       case "vision":
-        return <AIVision />;
-      case "voyage":
-        return <VoyageIntelligence />;
-      case "settings":
-        return <Settings />;
+        return <LiveMonitorView onNavigate={(tab) => setActiveTab(tab)} />;
+
+      case "twin":
+      case "ballast":
+      case "deck":
+        return <VesselDigitalTwinView />;
+
+      case "planner":
+      case "manifest":
+        return (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-brand-abyss">
+            <MultiContainerPlannerView />
+          </div>
+        );
+
+      case "audit":
+      case "reports":
+      case "history":
+      case "timeline":
+        return <OperationsAuditView />;
+
       default:
-        return <DashboardOverview />;
+        return <LiveMonitorView onNavigate={(tab) => setActiveTab(tab)} />;
     }
   };
 
   return (
-    <SocketProvider>
-      <ContainerOperationProvider>
-        <div className="flex h-screen w-screen overflow-hidden bg-brand-dark text-brand-text">
-          {/* Left Sidebar Navigation */}
-          <Sidebar 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            user={user} 
-            theme={theme}
-            setTheme={setTheme}
-          />
-
-          {/* Right Tab panel */}
-          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <ThemeProvider>
+      <SocketProvider>
+        <ContainerOperationProvider>
+          <AppShell
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            user={user}
+          >
             {renderTabContent()}
-          </main>
-        </div>
-      </ContainerOperationProvider>
-    </SocketProvider>
+          </AppShell>
+        </ContainerOperationProvider>
+      </SocketProvider>
+    </ThemeProvider>
   );
 };
 

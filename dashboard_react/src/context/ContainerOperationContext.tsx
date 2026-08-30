@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { containerAPI, operationsAPI } from "../utils/api";
+import { useSocket } from "./SocketContext";
 
 export interface Dimensions {
   length_ft?: number | null;
@@ -308,6 +309,7 @@ const ContainerOperationContext = createContext<ContainerOperationContextType | 
 export const EXTRACTION_REVIEW_THRESHOLD = 0.85;
 
 export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { refetchVesselState } = useSocket();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
@@ -367,9 +369,11 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
     } catch {
       // Non-blocking sync
     }
+    await refetchVesselState();
   };
 
   const executeStabilityAnalysis = async (data: ExtractedData): Promise<boolean> => {
+    if (isAnalyzing) return false;
     setIsAnalyzing(true);
     try {
       const payload = {
@@ -388,19 +392,78 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
         setOperationStatus(isReviewReq ? "REVIEW_REQUIRED" : "ANALYZED");
         return true;
       } else {
-        setErrorMessage(res.error_message || "Stability analysis could not be completed.");
+        setStabilityResult(null);
+        setErrorMessage(res.error_message ? `STABILITY ANALYSIS UNAVAILABLE: ${res.error_message}` : "STABILITY ANALYSIS UNAVAILABLE");
         return false;
       }
     } catch (err: any) {
-      const msg = err.response?.data?.detail || "Failed to execute stability placement analysis.";
-      setErrorMessage(msg);
+      const msg = err.response?.data?.detail || "STABILITY ANALYSIS UNAVAILABLE: Stability solver offline.";
+      setStabilityResult(null);
+      setErrorMessage(msg.startsWith("STABILITY ANALYSIS UNAVAILABLE") ? msg : `STABILITY ANALYSIS UNAVAILABLE: ${msg}`);
       return false;
     } finally {
       setIsAnalyzing(false);
     }
   };
 
+  const optimizeImageForUpload = async (file: File): Promise<File | Blob> => {
+
+    return new Promise((resolve) => {
+      // If already small (< 500KB) and not huge dimensions, return as is
+      if (file.size < 500 * 1024) {
+        resolve(file);
+        return;
+      }
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      img.onload = () => {
+        const maxDim = 1400;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const optimizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                type: "image/jpeg",
+                lastModified: Date.now()
+              });
+              resolve(optimizedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          0.92
+        );
+      };
+      img.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const processSlipFile = async (selectedFile: File): Promise<boolean> => {
+    if (isExtracting) return false;
     setFile(selectedFile);
     const objectUrl = URL.createObjectURL(selectedFile);
     setPreviewUrl(objectUrl);
@@ -414,8 +477,9 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
     setOperationStatus("EXTRACTING");
 
     try {
+      const uploadPayload = await optimizeImageForUpload(selectedFile);
       const formData = new FormData();
-      formData.append("image", selectedFile);
+      formData.append("image", uploadPayload as File);
       const res = await containerAPI.extract(formData);
 
       if (res.success) {
@@ -426,6 +490,8 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
           res.document?.processing_status === "review_required";
 
         if (isReviewReq) {
+          const reason = res.validation?.anomalies?.[0]?.message || res.validation?.warnings?.[0] || "Confidence or check-digit review required.";
+          setErrorMessage(`REVIEW REQUIRED: ${reason}`);
           setOperationStatus("REVIEW_REQUIRED");
         } else {
           setOperationStatus("EXTRACTED");
@@ -435,8 +501,8 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
         await executeStabilityAnalysis(res);
         return true;
       } else {
-        const warningMsg = res.validation?.errors?.[0] || res.validation?.warnings?.[0] || "Extraction returned with review notices.";
-        setErrorMessage(warningMsg);
+        const warningMsg = res.validation?.errors?.[0] || res.validation?.warnings?.[0] || "DOCUMENT PROCESSING FAILED: Review notices triggered.";
+        setErrorMessage(warningMsg.startsWith("DOCUMENT PROCESSING FAILED") ? warningMsg : `DOCUMENT PROCESSING FAILED: ${warningMsg}`);
         if (res.container) {
           setExtractedData(res);
           setOperationStatus("REVIEW_REQUIRED");
@@ -445,8 +511,8 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
         return false;
       }
     } catch (err: any) {
-      const errorDetail = err.response?.data?.detail || "Failed to extract container data from image.";
-      setErrorMessage(errorDetail);
+      const errorDetail = err.response?.data?.detail || err.message || "Please check image resolution/format and retry.";
+      setErrorMessage(`DOCUMENT PROCESSING FAILED: ${errorDetail}`);
       setOperationStatus("IDLE");
       return false;
     } finally {
@@ -455,48 +521,57 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
   };
 
   const loadSampleSlip = async () => {
+    if (isExtracting) return;
     resetOperation();
-    const sampleExtraction: ExtractedData = {
-      success: true,
-      document: {
-        source: "sample_container_slip.jpg",
-        processing_status: "success",
-        processing_time_ms: 142.5,
-        ocr_engine: "rapidocr-onnx"
-      },
-      container: {
-        container_number: "MSCU4920195",
-        container_type: "40HC",
-        dimensions: { length_ft: 40.0, width_ft: 8.0, height_ft: 9.5 },
-        weights: { tare_weight_kg: 3800.0, cargo_weight_kg: 22400.0, gross_weight_kg: 26200.0 },
-        cargo: { description: "ELECTRONIC COMPONENTS & LITHIUM CELLS", hazardous: true, un_number: "UN 3480", imdg_class: "Class 9" },
-        destination: "SINGAPORE"
-      },
-      confidence: {
-        overall: 0.96,
-        container_number: 0.98,
-        container_type: 0.92,
-        dimensions: 0.95,
-        weights: 0.96,
-        cargo: 0.98,
-        destination: 0.95
-      },
-      validation: {
-        valid: true,
-        iso_6346_valid: true,
-        weight_balance_valid: true,
-        warnings: [
-          "Hazardous cargo / dangerous goods detected (UN 3480, Class 9). Requires stowage segregation away from heat sources.",
-          "Verified Gross Mass (VGM) verified with SOLAS standard tolerance."
-        ],
-        errors: []
-      },
-      raw_text: "GLOBAL CONTAINER TERMINAL - INTERCHANGE RECEIPT\nGATE-IN VERIFICATION & VGM CERTIFICATE\nCONTAINER NO: MSCU 492019 5\nTYPE / ISO CODE: 40HC (45G1)\nDIMENSIONS: 40' x 8' x 9'6\" (12.19m x 2.44m x 2.89m)\nTARE WEIGHT: 3,800 KG / 8,377 LBS\nNET CARGO WT: 22,400 KG\nVERIFIED GROSS MASS (VGM): 26,200 KG [VERIFIED ACCURATE]\nCOMMODITY DESC: ELECTRONIC COMPONENTS & LITHIUM CELLS\nHAZMAT STATUS: HAZARDOUS - UN 3480 CLASS 9 (LITHIUM ION BATTERIES)\nPORT OF DISCHARGE: PORT OF SINGAPORE (SGSIN)\nSEAL NUMBER: ML-SG-987214\nCARRIER: MEDITERRANEAN SHIPPING COMPANY\nPORT AUTHORITY GATE 04 - APPROVED FOR LOADING"
-    };
+    setIsExtracting(true);
+    setOperationStatus("EXTRACTING");
+    setErrorMessage(null);
+    try {
+      // 1. Fetch real sample_container_slip.jpg fixture binary from backend
+      const imageBlob = await containerAPI.getDemoFixtureImage("sample_container_slip.jpg");
+      const sampleFile = new File([imageBlob], "sample_container_slip.jpg", { type: "image/jpeg" });
+      setFile(sampleFile);
+      const url = URL.createObjectURL(sampleFile);
+      setPreviewUrl(url);
 
-    setExtractedData(sampleExtraction);
-    setOperationStatus("EXTRACTED");
-    await executeStabilityAnalysis(sampleExtraction);
+      // 2. Submit real multipart/form-data to RapidOCR Document AI extraction
+      const formData = new FormData();
+      formData.append("file", sampleFile);
+      formData.append("image", sampleFile);
+
+      const res = await containerAPI.extract(formData);
+      if (res.success) {
+        setExtractedData(res);
+        const isReviewReq = 
+          (res.confidence?.overall !== undefined && res.confidence.overall < EXTRACTION_REVIEW_THRESHOLD) ||
+          res.validation?.valid === false ||
+          res.document?.processing_status === "review_required";
+
+        if (isReviewReq) {
+          const reason = res.validation?.anomalies?.[0]?.message || res.validation?.warnings?.[0] || "Confidence or check-digit review required.";
+          setErrorMessage(`REVIEW REQUIRED: ${reason}`);
+          setOperationStatus("REVIEW_REQUIRED");
+        } else {
+          setOperationStatus("EXTRACTED");
+        }
+        await executeStabilityAnalysis(res);
+      } else {
+        const warningMsg = res.validation?.errors?.[0] || res.validation?.warnings?.[0] || "DOCUMENT PROCESSING FAILED";
+        setErrorMessage(warningMsg.startsWith("DOCUMENT PROCESSING FAILED") ? warningMsg : `DOCUMENT PROCESSING FAILED: ${warningMsg}`);
+        if (res.container) {
+          setExtractedData(res);
+          setOperationStatus("REVIEW_REQUIRED");
+          await executeStabilityAnalysis(res);
+        }
+      }
+    } catch (err: any) {
+      console.error("Failed loading sample slip:", err);
+      const msg = err.response?.data?.detail || err.message || "Failed to extract sample container slip.";
+      setErrorMessage(`DOCUMENT PROCESSING FAILED: ${msg}`);
+      setOperationStatus("IDLE");
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const analyzeActiveStability = async (): Promise<boolean> => {
@@ -543,6 +618,7 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
   };
 
   const confirmAndLoadContainer = async (): Promise<boolean> => {
+    if (isLoadingContainer) return false;
     if (!extractedData || !stabilityResult || !stabilityResult.recommendation) {
       setErrorMessage("Cannot confirm load: Extracted container or stability recommendation is missing.");
       return false;
@@ -570,6 +646,7 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
       if (res.success) {
         setLoadedResult(res);
         setOperationStatus("LOADED");
+        await refetchVesselState();
         
         // Phase 3C: Automatically calculate ballast compensation for post-load vessel state
         await calculateBallastCompensation(res);
@@ -590,6 +667,7 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
   };
 
   const confirmAndExecuteBallast = async (): Promise<boolean> => {
+    if (isExecutingBallast) return false;
     if (!ballastCompensation || !ballastCompensation.tank_key) {
       setErrorMessage("No active ballast compensation calculation available to execute.");
       return false;
@@ -614,6 +692,7 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
       if (res.success) {
         setBallastExecutionResult(res);
         setOperationStatus("COMPLETED");
+        await refetchVesselState();
         return true;
       } else {
         setErrorMessage(res.error_message || "Ballast operation failed.");
@@ -635,6 +714,7 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
   const [isExecutingManifest, setIsExecutingManifest] = useState<boolean>(false);
 
   const generateManifestPlan = async (containers: any[], documents?: any[], validations?: any[]): Promise<MultiContainerPlanResponse | null> => {
+    if (isPlanningManifest) return null;
     setIsPlanningManifest(true);
     setErrorMessage(null);
     try {
@@ -661,6 +741,7 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
   };
 
   const executeManifestSequence = async (): Promise<boolean> => {
+    if (isExecutingManifest) return false;
     if (!manifestPlan || !manifestPlan.loading_sequence || manifestPlan.loading_sequence.length === 0) {
       setErrorMessage("No approved loading sequence to execute.");
       return false;
@@ -674,6 +755,7 @@ export const ContainerOperationProvider: React.FC<{ children: React.ReactNode }>
       };
       const res = await containerAPI.executeManifest(payload);
       if (res.success) {
+        await refetchVesselState();
         return true;
       } else {
         setErrorMessage(res.error_message || "Failed to execute manifest sequence.");

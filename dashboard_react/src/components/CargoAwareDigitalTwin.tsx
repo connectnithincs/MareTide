@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useSocket, type VesselState } from "../context/SocketContext";
 import { useContainerOperation } from "../context/ContainerOperationContext";
+import { VirtualESP32ScenarioControl } from "./VirtualESP32ScenarioControl";
+import { SafetyBadge } from "./ui/SafetyBadge";
 
 interface CargoAwareDigitalTwinProps {
   customVesselState?: VesselState | null;
@@ -36,10 +38,11 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
   
   const vessel = customVesselState || socketState;
   const [selectedStage, setSelectedStage] = useState<"BEFORE" | "LOADED" | "BALLASTED" | "CURRENT">("CURRENT");
+  const [showVirtualControls, setShowVirtualControls] = useState<boolean>(true);
 
   if (!vessel) {
     return (
-      <div className="bg-brand-surface border border-brand-border p-6 rounded-2xl flex items-center justify-center text-gray-400 space-x-3">
+      <div className="surface-base border border-maretide-borderStrong p-6 rounded-2xl flex items-center justify-center text-gray-400 space-x-3">
         <RefreshCw className="w-5 h-5 animate-spin text-blue-400" />
         <span className="text-xs font-bold uppercase tracking-wider">Connecting to Vessel Digital Twin Telemetry...</span>
       </div>
@@ -52,10 +55,24 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
   const rec = stabilityResult?.recommendation;
   const isSimulated = vessel.is_simulated ?? true;
   
-  // Phase 5/6A Telemetry Quality & Provenance
-  const telemetrySource = isSimulated ? "SIMULATED TELEMETRY" : "HARDWARE TELEMETRY — NON-AUTHORITATIVE";
-  const telemetrySourceLabel = isSimulated ? "[SIMULATED TELEMETRY]" : "[HARDWARE TELEMETRY — NON-AUTHORITATIVE]";
-  const connectionStatus = vessel.connection_status || (isSimulated ? "SIMULATED" : (socketConnected ? "CONNECTED" : "DISCONNECTED"));
+  // Phase 5/6/6J Telemetry Quality & Provenance
+  const rawSource = vessel.telemetry_source || (isSimulated ? "SIMULATED_TELEMETRY" : "HARDWARE_SENSOR");
+  const isVirtualESP32 = rawSource === "SIMULATED_ESP32" || rawSource === "virtual_esp32";
+  const telemetrySource = isVirtualESP32 
+    ? "SIMULATED ESP32" 
+    : isSimulated 
+    ? "SIMULATED TELEMETRY" 
+    : "HARDWARE SENSOR";
+  const telemetrySourceLabel = isVirtualESP32 
+    ? "[SIMULATED ESP32]" 
+    : isSimulated 
+    ? "[SIMULATED TELEMETRY]" 
+    : "[HARDWARE SENSOR]";
+  const connectionStatus = vessel.connection_status || (
+    isVirtualESP32 
+      ? "CONNECTED" 
+      : (isSimulated ? "SIMULATED" : (socketConnected ? "CONNECTED" : "DISCONNECTED"))
+  );
 
   const isStale = (vessel.stale_seconds && vessel.stale_seconds >= 5.0) || vessel.telemetry_freshness === "STALE";
   const isDisconnected = connectionStatus === "DISCONNECTED";
@@ -189,23 +206,23 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
   };
 
   return (
-    <div className="bg-brand-surface border border-brand-border rounded-2xl p-5 shadow-2xl space-y-5">
+    <div className="surface-elevated border border-brand-borderSubtle rounded-2xl p-5 shadow-2xl space-y-5">
       {/* 1. Header with Title, Ship Info, and Multi-Layer Provenance Badges */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between border-b border-brand-border/60 pb-3 gap-3">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between border-b border-brand-borderSubtle pb-3 gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400">
+          <div className="p-2.5 bg-brand-cyanBg border border-brand-cyan/30 rounded-xl text-brand-cyan shadow-sm shadow-brand-cyan/20">
             <Activity className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-black text-white uppercase tracking-wide">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base font-black text-brand-text uppercase tracking-wide font-mono">
                 Cargo-Aware Vessel Digital Twin
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40 uppercase">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full surface-base text-brand-cyan border border-brand-cyan/30 uppercase font-bold">
                 {vessel.ship_name}
               </span>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-brand-muted mt-0.5">
               Live bay cross-section, ballast compartments, pump telemetry, and predictive hydrostatic monitoring.
             </p>
           </div>
@@ -213,44 +230,31 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
 
         {/* 5-Tier Data Provenance Badges */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 bg-emerald-950/40 text-emerald-300 border-emerald-500/40" title="Cargo weight & dimensions authoritative source">
-            <ShieldCheck className="w-3 h-3 text-emerald-400" />
-            <span>[DOCUMENT AI]</span>
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 bg-blue-950/40 text-blue-300 border-blue-500/40" title="Hydrostatic physics stability engine">
-            <Compass className="w-3 h-3 text-blue-400" />
-            <span>[CALCULATED]</span>
-          </span>
-          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 ${
-            isDisconnected
-              ? "bg-red-950/40 text-red-300 border-red-500/40"
-              : isSimulated 
-                ? "bg-purple-950/40 text-purple-300 border-purple-500/40" 
-                : "bg-emerald-950/40 text-emerald-300 border-emerald-500/40"
-          }`} title="Physical motion inclinometer & telemetry source">
-            <Radio className="w-3 h-3 animate-pulse" />
-            <span>{telemetrySourceLabel}</span>
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 bg-amber-950/40 text-amber-300 border-amber-500/40" title="Candidate pre-load simulation engine">
-            <Zap className="w-3 h-3 text-amber-400" />
-            <span>[PREDICTED]</span>
-          </span>
+          <SafetyBadge type="DOCUMENT_AI" size="sm" />
+          <SafetyBadge type="CALCULATED" size="sm" />
+          <SafetyBadge 
+            type={isDisconnected ? "DISCONNECTED" : isSimulated ? "SIMULATED_TELEMETRY" : "HARDWARE_TELEMETRY"} 
+            label={telemetrySourceLabel}
+            size="sm" 
+          />
+          <SafetyBadge type="PREDICTED" size="sm" />
         </div>
       </div>
 
+
       {/* 2. Real-Time Telemetry Quality, Freshness, & Pump Status Bar */}
-      <div className="bg-brand-app/80 border border-brand-border/80 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+      <div className="surface-base border border-brand-borderSubtle rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
         {/* Connection Status */}
         <div className="flex items-center gap-2">
           {isDisconnected ? (
-            <WifiOff className="w-4 h-4 text-red-400 shrink-0" />
+            <WifiOff className="w-4 h-4 text-brand-danger shrink-0" />
           ) : (
-            <Wifi className="w-4 h-4 text-emerald-400 shrink-0" />
+            <Wifi className="w-4 h-4 text-brand-safe shrink-0" />
           )}
           <div>
-            <div className="text-[9px] text-gray-400 uppercase font-bold">Link Status</div>
+            <div className="text-[9px] text-brand-muted uppercase font-bold">Link Status</div>
             <div className={`font-mono font-bold text-[11px] uppercase ${
-              isDisconnected ? "text-red-400" : (isSimulated ? "text-purple-300" : "text-emerald-400")
+              isDisconnected ? "text-brand-danger" : (isSimulated ? "text-brand-purple" : "text-brand-safe")
             }`}>
               {connectionStatus}
             </div>
@@ -259,29 +263,29 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
 
         {/* Telemetry Freshness & Timestamp */}
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
+          <Clock className="w-4 h-4 text-brand-cyan shrink-0" />
           <div>
-            <div className="text-[9px] text-gray-400 uppercase font-bold">Freshness & Time</div>
+            <div className="text-[9px] text-brand-muted uppercase font-bold">Freshness & Time</div>
             <div className="flex items-center gap-1 font-mono text-[11px]">
               <span className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${
-                isStale ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"
+                isStale ? "bg-brand-warningBg text-brand-warning" : "bg-brand-safeBg text-brand-safe"
               }`}>
                 {isStale ? `STALE (+${staleSeconds.toFixed(0)}s)` : "FRESH"}
               </span>
-              <span className="text-gray-300 text-[10px]">{timestampStr}</span>
+              <span className="text-brand-textSecondary text-[10px]">{timestampStr}</span>
             </div>
           </div>
         </div>
 
         {/* Pump Operational State */}
         <div className="flex items-center gap-2">
-          <Droplets className={`w-4 h-4 shrink-0 ${pumpActive ? "text-cyan-400 animate-bounce" : "text-gray-400"}`} />
+          <Droplets className={`w-4 h-4 shrink-0 ${pumpActive ? "text-brand-cyan animate-bounce" : "text-brand-muted"}`} />
           <div>
-            <div className="text-[9px] text-gray-400 uppercase font-bold">Ballast Pump</div>
+            <div className="text-[9px] text-brand-muted uppercase font-bold">Ballast Pump</div>
             <div className="flex items-center gap-1 font-mono font-bold text-[11px]">
-              <span className={pumpActive ? "text-cyan-300" : "text-gray-300"}>{pumpState}</span>
+              <span className={pumpActive ? "text-brand-cyan" : "text-brand-textSecondary"}>{pumpState}</span>
               {pumpActive && pumpFlow > 0 && (
-                <span className="text-[9px] text-cyan-400">({pumpFlow.toFixed(1)} L/s)</span>
+                <span className="text-[9px] text-brand-cyan">({pumpFlow.toFixed(1)} L/s)</span>
               )}
             </div>
           </div>
@@ -289,15 +293,16 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
 
         {/* Cargo Weight Provenance Verification */}
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <ShieldCheck className="w-4 h-4 text-brand-safe shrink-0" />
           <div>
-            <div className="text-[9px] text-gray-400 uppercase font-bold">Cargo Mass Source</div>
-            <div className="font-mono font-bold text-[11px] text-emerald-300">
-              DOCUMENT AI <span className="text-[9px] text-gray-400 font-normal">(Zero Load-Cell)</span>
+            <div className="text-[9px] text-brand-muted uppercase font-bold">Cargo Mass Source</div>
+            <div className="font-mono font-bold text-[11px] text-brand-safe">
+              DOCUMENT AI <span className="text-[9px] text-brand-muted font-normal">(Zero Load-Cell)</span>
             </div>
           </div>
         </div>
       </div>
+
 
       {/* 3. Stale Telemetry Warning Banner (if applicable) */}
       {(isStale || isDisconnected) && (
@@ -357,7 +362,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
       )}
 
       {/* 5. 4-Stage Lifecycle Stepper with Explicit Provenance Tags */}
-      <div className="bg-brand-app/60 border border-brand-border/80 rounded-xl p-3 space-y-2">
+      <div className="bg-brand-app/60 border border-maretide-borderStrong/80 rounded-xl p-3 space-y-2">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-blue-400" />
@@ -379,7 +384,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
                 className={`p-2.5 rounded-lg border text-left transition-all ${
                   isSelected
                     ? "bg-blue-600/20 border-blue-500 text-white shadow-md shadow-blue-500/10"
-                    : "bg-brand-dark/60 border-brand-border/60 text-gray-400 hover:text-gray-200 hover:border-gray-500"
+                    : "bg-brand-dark/60 border-maretide-borderStrong/60 text-gray-400 hover:text-gray-200 hover:border-gray-500"
                 }`}
               >
                 <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider truncate mb-1">
@@ -401,6 +406,9 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
         </div>
       </div>
 
+      {/* 5.5 Virtual ESP32 Live Reaction & Scenario Controls */}
+      <VirtualESP32ScenarioControl />
+
       {/* 6. 4-Bay Vessel Cross-Section & SCADA Ballast Twin */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -421,9 +429,9 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
             const stbdTank = tanks[`starboard_${bayNum}`] || { name: `ST-${bayNum}`, current_volume: 300, capacity: 300, fill_ratio: 1.0 };
 
             return (
-              <div key={bayNum} className="bg-brand-dark/90 border border-brand-border rounded-xl p-3 space-y-2 shadow-sm">
+              <div key={bayNum} className="bg-brand-dark/90 border border-maretide-borderStrong rounded-xl p-3 space-y-2 shadow-sm">
                 {/* Bay Header */}
-                <div className="flex items-center justify-between border-b border-brand-border/50 pb-1.5 text-xs">
+                <div className="flex items-center justify-between border-b border-maretide-borderStrong/50 pb-1.5 text-xs">
                   <span className="font-black text-white uppercase tracking-wider">
                     Bay {bayNum.toString().padStart(2, '0')}
                   </span>
@@ -452,7 +460,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
                 </div>
 
                 {/* Ballast Tanks at Keel Level */}
-                <div className="pt-2 border-t border-brand-border/40 grid grid-cols-2 gap-1.5 text-[10px]">
+                <div className="pt-2 border-t border-maretide-borderStrong/40 grid grid-cols-2 gap-1.5 text-[10px]">
                   {/* Port Tank */}
                   <div className="bg-blue-950/30 border border-blue-500/30 rounded p-1.5 space-y-1">
                     <div className="flex items-center justify-between text-blue-300 font-bold">
@@ -499,7 +507,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
 
       {/* 7. PROJECTED vs ACTUAL Predictive Monitoring Matrix */}
       {stabilityResult && (
-        <div className="bg-brand-app/70 border border-brand-border rounded-xl p-4 space-y-3">
+        <div className="bg-brand-app/70 border border-maretide-borderStrong rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Compass className="w-4 h-4 text-cyan-400" />
@@ -519,7 +527,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
             {/* List Comparison */}
-            <div className="bg-black/30 p-3 rounded-lg border border-brand-border/60 space-y-1">
+            <div className="bg-black/30 p-3 rounded-lg border border-maretide-borderStrong/60 space-y-1">
               <span className="text-[10px] text-gray-400 uppercase font-bold block">Transverse List</span>
               <div className="flex items-baseline justify-between font-mono">
                 <span className="text-amber-400 text-[10px]">[PREDICTED]:</span>
@@ -536,7 +544,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
             </div>
 
             {/* Trim Comparison */}
-            <div className="bg-black/30 p-3 rounded-lg border border-brand-border/60 space-y-1">
+            <div className="bg-black/30 p-3 rounded-lg border border-maretide-borderStrong/60 space-y-1">
               <span className="text-[10px] text-gray-400 uppercase font-bold block">Longitudinal Trim</span>
               <div className="flex items-baseline justify-between font-mono">
                 <span className="text-amber-400 text-[10px]">[PREDICTED]:</span>
@@ -553,7 +561,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
             </div>
 
             {/* Stability Score Comparison */}
-            <div className="bg-black/30 p-3 rounded-lg border border-brand-border/60 space-y-1">
+            <div className="bg-black/30 p-3 rounded-lg border border-maretide-borderStrong/60 space-y-1">
               <span className="text-[10px] text-gray-400 uppercase font-bold block">Stability Score</span>
               <div className="flex items-baseline justify-between font-mono">
                 <span className="text-amber-400 text-[10px]">[PREDICTED]:</span>
@@ -570,7 +578,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
             </div>
 
             {/* Ballast Requirement */}
-            <div className="bg-black/30 p-3 rounded-lg border border-brand-border/60 space-y-1">
+            <div className="bg-black/30 p-3 rounded-lg border border-maretide-borderStrong/60 space-y-1">
               <span className="text-[10px] text-gray-400 uppercase font-bold block">Ballast Compensation</span>
               <div className="flex items-baseline justify-between font-mono">
                 <span className="text-amber-400 text-[10px]">[PREDICTED]:</span>
@@ -595,7 +603,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
   function renderSlot(bay: number, side: "PORT" | "STARBOARD", tier: number, container?: any, isProjected?: boolean) {
     if (container) {
       return (
-        <div className="bg-brand-surface border border-brand-border p-2 rounded text-center space-y-0.5 shadow-inner">
+        <div className="surface-base border border-maretide-borderStrong p-2 rounded text-center space-y-0.5 shadow-inner">
           <div className="flex items-center justify-between text-[9px] text-gray-400">
             <span>{side[0]}T{tier}</span>
             <span className="text-emerald-400 font-bold font-mono">{container.weight}t</span>
@@ -628,7 +636,7 @@ export const CargoAwareDigitalTwin: React.FC<CargoAwareDigitalTwinProps> = ({
     }
 
     return (
-      <div className="bg-brand-dark/40 border border-brand-border/40 p-2 rounded text-center text-gray-600 text-[9px] font-mono">
+      <div className="bg-brand-dark/40 border border-maretide-borderStrong/40 p-2 rounded text-center text-gray-600 text-[9px] font-mono">
         {side[0]}T{tier} (Empty)
       </div>
     );

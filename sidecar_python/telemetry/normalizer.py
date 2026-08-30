@@ -235,6 +235,38 @@ class TelemetryNormalizer:
             errors=errors
         )
 
+        # Determine telemetry provenance labels
+        if source == TelemetrySource.HARDWARE_SENSOR:
+            tel_label = "[HARDWARE SENSOR]"
+            diag_load_label = "[HARDWARE SENSOR — DIAGNOSTIC ONLY]"
+        elif source == TelemetrySource.SIMULATED_ESP32:
+            tel_label = "[SIMULATED ESP32]"
+            diag_load_label = "[SIMULATED ESP32 — DIAGNOSTIC ONLY]"
+        else:
+            tel_label = "[SIMULATED TELEMETRY]"
+            diag_load_label = "[SIMULATED — DIAGNOSTIC ONLY]"
+
+        provenance_map = {
+            "roll": tel_label,
+            "pitch": tel_label,
+            "telemetry": tel_label,
+            "container_weight": "[DOCUMENT AI]",
+            "cargo_weight": "[DOCUMENT AI]",
+            "stability_index": "[CALCULATED]",
+            "vessel_hydrostatics": "[CALCULATED]",
+            "recommended_placement": "[CALCULATED]",
+            "operator_authorization": "[OPERATOR]",
+            "diagnostic_load_cell": diag_load_label,
+            "predictions": "[PREDICTED]"
+        }
+
+        # Extract isolated diagnostic load-cell value if provided in raw stream
+        diag_load_kg = None
+        for key in ["cargo_kg", "scale_kg", "load_cell", "hx711"]:
+            if key in raw_data and raw_data[key] is not None:
+                diag_load_kg = cls._safe_float(raw_data[key])
+                break
+
         return NormalizedTelemetry(
             timestamp=ts_str,
             timestamp_epoch=epoch_val,
@@ -245,7 +277,9 @@ class TelemetryNormalizer:
             pumps=pumps,
             flow_info=flow_info,
             operational_telemetry=operational_telemetry,
-            metadata=metadata
+            metadata=metadata,
+            provenance_map=provenance_map,
+            diagnostic_load_cell_kg=diag_load_kg
         )
 
     @classmethod
@@ -287,6 +321,30 @@ class TelemetryNormalizer:
             errors=[]
         )
 
+        if source == TelemetrySource.HARDWARE_SENSOR:
+            tel_label = "[HARDWARE SENSOR]"
+            diag_load_label = "[HARDWARE SENSOR — DIAGNOSTIC ONLY]"
+        elif source == TelemetrySource.SIMULATED_ESP32:
+            tel_label = "[SIMULATED ESP32]"
+            diag_load_label = "[SIMULATED ESP32 — DIAGNOSTIC ONLY]"
+        else:
+            tel_label = "[SIMULATED TELEMETRY]"
+            diag_load_label = "[SIMULATED — DIAGNOSTIC ONLY]"
+
+        provenance_map = {
+            "roll": tel_label,
+            "pitch": tel_label,
+            "telemetry": tel_label,
+            "container_weight": "[DOCUMENT AI]",
+            "cargo_weight": "[DOCUMENT AI]",
+            "stability_index": "[CALCULATED]",
+            "vessel_hydrostatics": "[CALCULATED]",
+            "recommended_placement": "[CALCULATED]",
+            "operator_authorization": "[OPERATOR]",
+            "diagnostic_load_cell": diag_load_label,
+            "predictions": "[PREDICTED]"
+        }
+
         return NormalizedTelemetry(
             timestamp=ts_str,
             timestamp_epoch=now,
@@ -297,7 +355,9 @@ class TelemetryNormalizer:
             pumps={"PUMP_MAIN": PumpTelemetry(pump_id="PUMP_MAIN", state=PumpState.IDLE)},
             flow_info=FlowTelemetry(),
             operational_telemetry=OperationalTelemetry(status="IDLE", risk_level="SAFE"),
-            metadata=metadata
+            metadata=metadata,
+            provenance_map=provenance_map,
+            diagnostic_load_cell_kg=None
         )
 
     @staticmethod

@@ -17,7 +17,7 @@ class BaseTelemetryAdapter(ABC):
     def __init__(self, adapter_id: str, source_type: TelemetrySource):
         self.adapter_id = adapter_id
         self.source_type = source_type
-        self.is_simulated = (source_type == TelemetrySource.SIMULATED_TELEMETRY)
+        self.is_simulated = (source_type in [TelemetrySource.SIMULATED_TELEMETRY, TelemetrySource.SIMULATED_ESP32])
 
     @abstractmethod
     def connect(self) -> bool:

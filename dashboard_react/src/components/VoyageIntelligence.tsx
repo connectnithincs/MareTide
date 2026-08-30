@@ -75,9 +75,9 @@ export const VoyageIntelligence: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-brand-dark p-8">
-        <RefreshCw className="w-12 h-12 text-brand-accent animate-spin mb-4" />
-        <p className="text-sm text-brand-muted font-bold animate-pulse">Loading voyage coordinates and AIS track...</p>
+      <div className="flex-1 flex flex-col items-center justify-center surface-base p-8">
+        <RefreshCw className="w-12 h-12 text-brand-cyan animate-spin mb-4" />
+        <p className="text-sm text-brand-muted font-bold animate-pulse font-mono">Loading voyage coordinates and AIS track...</p>
       </div>
     );
   }
@@ -128,32 +128,39 @@ export const VoyageIntelligence: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-brand-dark">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-brand-abyss">
       {/* Title */}
-      <div className="flex items-center justify-between border-b border-brand-border pb-4">
+      <div className="flex items-center justify-between border-b border-brand-borderSubtle pb-4">
         <div>
-          <h2 className="text-xl font-black text-brand-text tracking-wide uppercase">Voyage Intelligence</h2>
-          <p className="text-xs text-brand-muted font-semibold mt-1">Vessel dimensions, cargo metrics, and live AIS tracking.</p>
+          <h2 className="text-sm font-black text-brand-text tracking-wide uppercase font-mono">
+            Voyage Intelligence
+          </h2>
+          <p className="text-xs text-brand-muted font-medium mt-1">
+            Vessel dimensions, cargo metrics, and live AIS tracking.
+          </p>
         </div>
         <button 
           onClick={fetchVoyageData}
-          className="p-2 bg-brand-border/40 hover:bg-brand-border text-brand-muted hover:text-brand-text rounded-lg border border-brand-border transition-colors"
+          className="p-2 surface-base hover:bg-brand-hover text-brand-muted hover:text-brand-text rounded-xl border border-brand-borderSubtle transition-all shadow-sm active:scale-95"
+          title="Refresh Voyage Data"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="w-4 h-4 text-brand-cyan" />
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Vessel Specifications Panel */}
-        <div className="border border-brand-border bg-brand-card rounded-xl p-5 shadow-lg glass-panel flex flex-col gap-4">
-          <div className="flex items-center gap-2 pb-2 border-b border-brand-border">
-            <Ship className="text-brand-accent w-5 h-5" />
-            <h3 className="font-black text-xs text-brand-text uppercase tracking-wide">Vessel Profile Specifications</h3>
+        <div className="surface-elevated border border-brand-borderSubtle rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-brand-borderSubtle">
+            <Ship className="text-brand-cyan w-5 h-5" />
+            <h3 className="font-black text-xs text-brand-text uppercase tracking-wide font-mono">
+              Vessel Profile Specifications
+            </h3>
           </div>
 
           {profile ? (
-            <div className="space-y-4 text-xs font-semibold">
-              <div className="space-y-2 bg-brand-app p-4 border border-brand-border rounded-xl leading-relaxed shadow-sm">
+            <div className="space-y-4 text-xs font-semibold font-mono">
+              <div className="space-y-2 surface-base p-4 border border-brand-borderSubtle rounded-xl leading-relaxed shadow-sm">
                 <div className="flex justify-between">
                   <span className="text-brand-muted uppercase text-[10px] tracking-wider">Vessel Name</span>
                   <span className="text-brand-text uppercase font-bold">{profile.ship_name}</span>
@@ -177,8 +184,10 @@ export const VoyageIntelligence: React.FC = () => {
               </div>
 
               {/* Cargo specs */}
-              <div className="space-y-2 bg-brand-app p-4 border border-brand-border rounded-xl leading-relaxed shadow-sm">
-                <span className="text-[10px] text-brand-muted uppercase font-bold tracking-wider block mb-1">Cargo Loading Manifest</span>
+              <div className="space-y-2 surface-base p-4 border border-brand-borderSubtle rounded-xl leading-relaxed shadow-sm">
+                <span className="text-[10px] text-brand-muted uppercase font-bold tracking-wider block mb-1">
+                  Cargo Loading Manifest
+                </span>
                 <div className="flex justify-between">
                   <span className="text-brand-muted uppercase text-[10px] tracking-wider">Cargo Type</span>
                   <span className="text-brand-text">{profile.cargo_data.product}</span>
@@ -190,22 +199,26 @@ export const VoyageIntelligence: React.FC = () => {
               </div>
             </div>
           ) : (
-            <span className="text-xs text-brand-muted italic">Profile details unavailable.</span>
+            <span className="text-xs text-brand-muted italic font-mono">Profile details unavailable.</span>
           )}
         </div>
 
         {/* Live AIS Map container (Right 2 cols) */}
-        <div className="lg:col-span-2 border border-brand-border bg-brand-card rounded-xl p-4 shadow-lg glass-panel flex flex-col gap-3 min-h-[400px]">
-          <div className="flex items-center justify-between pb-2 border-b border-brand-border">
+        <div className="lg:col-span-2 surface-elevated border border-brand-borderSubtle rounded-2xl p-4 shadow-sm flex flex-col gap-3 min-h-[400px]">
+          <div className="flex items-center justify-between pb-2 border-b border-brand-borderSubtle">
             <div className="flex items-center gap-2">
-              <Compass className="text-brand-accent w-4 h-4 animate-spin-slow" />
-              <span className="text-xs font-black text-brand-text uppercase tracking-wide">Live AIS Tracking Map</span>
+              <Compass className="text-brand-cyan w-4 h-4" />
+              <span className="text-xs font-black text-brand-text uppercase tracking-wide font-mono">
+                Live AIS Tracking Map
+              </span>
             </div>
-            <span className="text-[10px] text-brand-accent font-black uppercase tracking-wider">{providerLabel}</span>
+            <span className="text-[10px] text-brand-cyan font-black uppercase tracking-wider font-mono">
+              {providerLabel}
+            </span>
           </div>
 
           {/* Leaflet Map rendering */}
-          <div className="flex-1 rounded-lg overflow-hidden border border-brand-border/60 relative z-10">
+          <div className="flex-1 rounded-xl overflow-hidden border border-brand-borderSubtle relative z-10">
             <MapContainer 
               center={currentPosition} 
               zoom={9} 
@@ -216,10 +229,10 @@ export const VoyageIntelligence: React.FC = () => {
                 attribution={attribution}
                 url={tileUrl}
               />
-              {track.length > 0 && <Polyline positions={polylineCoords} color="#10b981" weight={3} />}
+              {track.length > 0 && <Polyline positions={polylineCoords} color="#00E5FF" weight={3} />}
               <Marker position={currentPosition}>
                 <Popup>
-                  <div className="text-xs font-semibold uppercase leading-tight">
+                  <div className="text-xs font-semibold uppercase leading-tight text-slate-950 font-mono">
                     <strong>{profile?.ship_name || "ALGAMAR"}</strong><br/>
                     Status: Underway using engine<br/>
                     IMO: {profile?.imo || "8735106"}
@@ -233,3 +246,4 @@ export const VoyageIntelligence: React.FC = () => {
     </div>
   );
 };
+

@@ -60,10 +60,20 @@ const forwardTo = (targetBaseUrl) => async (req, res) => {
   const url = `${targetBaseUrl}${req.originalUrl}`;
   try {
     const isMultipart = (req.headers['content-type'] || '').includes('multipart/form-data');
+    let reqData = req.body;
+
+    if (isMultipart) {
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      reqData = Buffer.concat(chunks);
+    }
+
     const config = {
       method: req.method,
       url: url,
-      data: isMultipart ? req : req.body,
+      data: reqData,
       headers: { ...req.headers },
       maxBodyLength: Infinity,
       maxContentLength: Infinity
@@ -71,6 +81,7 @@ const forwardTo = (targetBaseUrl) => async (req, res) => {
     // Delete host, origin, and problematic proxy headers
     delete config.headers.host;
     delete config.headers.origin;
+
     if (!isMultipart) {
       delete config.headers['content-length'];
       delete config.headers['Content-Length'];
@@ -123,6 +134,8 @@ app.get("/api/auth/session", async (req, res) => {
 });
 
 // Proxy all other calculations, telemetry, loading flow controls and logs to FastAPI Sidecar
+app.all("/health", forwardTo(SIDECAR_URL));
+app.all("/api/health", forwardTo(SIDECAR_URL));
 app.all("/api/vessel-state", forwardTo(SIDECAR_URL));
 app.all("/api/ballast/*", forwardTo(SIDECAR_URL));
 app.all("/api/recommendations", forwardTo(SIDECAR_URL));
@@ -130,8 +143,11 @@ app.all("/api/deck-plan", forwardTo(SIDECAR_URL));
 app.all("/api/reports/*", forwardTo(SIDECAR_URL));
 app.all("/api/telemetry/*", forwardTo(SIDECAR_URL));
 app.all("/api/vision/*", forwardTo(SIDECAR_URL));
+app.all("/api/video/*", forwardTo(SIDECAR_URL));
 app.all("/api/voyage/*", forwardTo(SIDECAR_URL));
 app.all("/api/container/*", forwardTo(SIDECAR_URL));
+app.all("/api/containers/*", forwardTo(SIDECAR_URL));
+app.all("/api/safety-gate/*", forwardTo(SIDECAR_URL));
 app.all("/api/digital-twin/*", forwardTo(SIDECAR_URL));
 app.all("/api/operations/*", forwardTo(SIDECAR_URL));
 

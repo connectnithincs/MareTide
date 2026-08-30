@@ -19,6 +19,7 @@ from telemetry.models import (
 from telemetry.adapters.base import BaseTelemetryAdapter
 from telemetry.adapters.simulator_adapter import SimulatorTelemetryAdapter
 from telemetry.adapters.hardware_adapter import HardwareSerialAdapter
+from telemetry.adapters.virtual_esp32_adapter import VirtualESP32Adapter
 from telemetry.normalizer import TelemetryNormalizer
 from telemetry.validator import TelemetryValidator
 from telemetry.quality_monitor import TelemetryQualityMonitor
@@ -34,6 +35,7 @@ class TelemetryManager:
     _lock = threading.Lock()
 
     def __init__(self):
+        import os
         self._mutex = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -44,12 +46,41 @@ class TelemetryManager:
         # Adapters
         self._sim_adapter = SimulatorTelemetryAdapter()
         self._hw_adapter = HardwareSerialAdapter()
-        self._active_adapter: BaseTelemetryAdapter = self._sim_adapter
+        self._virtual_esp32_adapter = VirtualESP32Adapter()
         
+        # Mode from environment (MARETIDE_TELEMETRY_MODE or EV_TELEMETRY_MODE)
+        env_mode = (
+            os.environ.get("MARETIDE_TELEMETRY_MODE")
+            or os.environ.get("EV_TELEMETRY_MODE")
+            or os.environ.get("TELEMETRY_MODE")
+            or ""
+        ).strip().lower()
+
+        serial_port = (
+            os.environ.get("MARETIDE_SERIAL_PORT")
+            or os.environ.get("EV_SERIAL_PORT")
+            or os.environ.get("SERIAL_PORT")
+        )
+
+        if env_mode in ["virtual_esp32", "virtual", "simulated_esp32"]:
+            self._active_adapter = self._virtual_esp32_adapter
+            initial_source = TelemetrySource.SIMULATED_ESP32
+            initial_status = ConnectionStatus.CONNECTED
+        elif env_mode in ["real_esp32", "hardware", "hardware_sensor", "real"]:
+            if serial_port:
+                self._hw_adapter.port = serial_port
+            self._active_adapter = self._hw_adapter
+            initial_source = TelemetrySource.HARDWARE_SENSOR
+            initial_status = ConnectionStatus.DISCONNECTED
+        else:
+            self._active_adapter = self._sim_adapter
+            initial_source = TelemetrySource.SIMULATED_TELEMETRY
+            initial_status = ConnectionStatus.SIMULATED
+
         # State caches
         self._latest_normalized: NormalizedTelemetry = TelemetryNormalizer.get_safe_fallback_telemetry(
-            source=TelemetrySource.SIMULATED_TELEMETRY,
-            connection_status=ConnectionStatus.SIMULATED
+            source=initial_source,
+            connection_status=initial_status
         )
         self._listeners: List[Callable[[NormalizedTelemetry], None]] = []
         self._sequence_counter = 0
@@ -83,23 +114,56 @@ class TelemetryManager:
                 self._thread.join(timeout=1.0)
                 self._thread = None
 
-    def select_source(self, source: TelemetrySource, port: Optional[str] = None) -> bool:
-        """Switches the active telemetry source between Simulator and Hardware Serial."""
+    def select_source(self, source: Any, port: Optional[str] = None) -> bool:
+        """Switches the active telemetry source between Simulator, Virtual ESP32, and Hardware Serial."""
+        if isinstance(source, str):
+            source_lower = source.strip().lower()
+            if source_lower in ["hardware_sensor", "real_esp32", "real", "hardware"]:
+                source_enum = TelemetrySource.HARDWARE_SENSOR
+            elif source_lower in ["simulated_esp32", "virtual_esp32", "virtual"]:
+                source_enum = TelemetrySource.SIMULATED_ESP32
+            else:
+                source_enum = TelemetrySource.SIMULATED_TELEMETRY
+        else:
+            source_enum = source
+
         with self._mutex:
             if self._active_adapter:
                 self._active_adapter.disconnect()
 
-            if source == TelemetrySource.HARDWARE_SENSOR:
+            if source_enum == TelemetrySource.HARDWARE_SENSOR:
                 if port:
                     self._hw_adapter.port = port
                 self._active_adapter = self._hw_adapter
+                init_status = ConnectionStatus.CONNECTED if self._hw_adapter.is_connected() else ConnectionStatus.DISCONNECTED
+            elif source_enum == TelemetrySource.SIMULATED_ESP32:
+                self._active_adapter = self._virtual_esp32_adapter
+                init_status = ConnectionStatus.CONNECTED
             else:
                 self._active_adapter = self._sim_adapter
+                init_status = ConnectionStatus.SIMULATED
 
             if self._running:
                 self._active_adapter.connect()
-            logger.info(f"Switched telemetry source to {source.value} (Adapter: {self._active_adapter.adapter_id})")
+
+            self._latest_normalized = TelemetryNormalizer.get_safe_fallback_telemetry(
+                source=self._active_adapter.source_type,
+                connection_status=init_status
+            )
+            logger.info(f"Switched telemetry source to {source_enum.value} (Adapter: {self._active_adapter.adapter_id})")
             return True
+
+    def set_virtual_scenario(self, scenario: str) -> bool:
+        """Configures scenario for Virtual ESP32 adapter."""
+        return self._virtual_esp32_adapter.set_scenario(scenario)
+
+    def send_virtual_command(self, cmd: str) -> None:
+        """Sends command to Virtual ESP32 microcontroller."""
+        self._virtual_esp32_adapter.send_command(cmd)
+
+    def get_virtual_firmware_state(self) -> Dict[str, Any]:
+        """Returns internal registers of Virtual ESP32."""
+        return self._virtual_esp32_adapter.get_firmware_state()
 
     def get_active_adapter(self) -> BaseTelemetryAdapter:
         with self._mutex:

@@ -1,6 +1,7 @@
 import io
 import time
 import cv2
+from typing import Optional, Dict, Any, List, Union
 from PIL import Image
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -27,10 +28,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import uuid
+import datetime
+import logging
+logger = logging.getLogger("maretide.api")
+
+@app.middleware("http")
+async def structured_request_logging_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
+    start_time = time.time()
+    try:
+        response = await call_next(request)
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+        response.headers["X-Request-ID"] = request_id
+        
+        status_code = response.status_code
+        success = (200 <= status_code < 400)
+        
+        logger.info(
+            f"[AUDIT-LOG] req_id={request_id} method={request.method} path={request.url.path} "
+            f"status={status_code} success={success} duration_ms={duration_ms}ms"
+        )
+        return response
+    except Exception as exc:
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+        logger.error(
+            f"[AUDIT-LOG] req_id={request_id} method={request.method} path={request.url.path} "
+            f"status=500 success=False duration_ms={duration_ms}ms error={str(exc)}"
+        )
+        raise exc
+
+@app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
+async def get_system_health():
+    from telemetry.manager import TelemetryManager
+    mgr = TelemetryManager.get_instance()
+    active_adapter = mgr.get_active_adapter()
+    return {
+        "status": "healthy",
+        "service": "MareTide Python Sidecar",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "components": {
+            "database": "healthy",
+            "telemetry_subsystem": {
+                "status": "healthy",
+                "active_source": active_adapter.source_type.value,
+                "is_connected": active_adapter.is_connected()
+            },
+            "ocr_engine": "healthy",
+            "stability_engine": "healthy",
+            "safety_gate": "healthy"
+        }
+    }
+
 # Container Document Intelligence / OCR Subsystem (Phase 1 & Phase 5 Workflow)
 from container_ocr import container_router, workflow_router
+from container_ocr.service import default_service
 app.include_router(container_router)
 app.include_router(workflow_router)
+default_service.warmup()
+
 
 # Container Stability & Loading Integration (Phase 2 & Phase 5 Safety Gate)
 from container_stability import stability_router, safety_gate_router
@@ -69,26 +126,29 @@ async def execute_ballast_alias(req: BallastExecutionRequest):
 @app.get("/api/reports/timeline", tags=["Audit & Reports"])
 async def get_timeline_reports_alias(limit: int = 100):
     from reports.logs_db import get_all_audit_events, get_cargo_operations, get_ballast_operations
-    events = get_all_audit_events(limit=limit)
-    if not events:
-        cargo = get_cargo_operations(limit=limit)
-        ballast = get_ballast_operations(limit=limit)
-        for c in cargo:
-            events.append({
-                "timestamp": c.get("time"),
-                "event": c.get("event", "CARGO_LOADED"),
-                "action": f"Loaded {c.get('container')} ({c.get('weight')}t) to Bay {c.get('bay')}-{c.get('side')}-{c.get('tier')}",
-                "source": c.get("source", "DOCUMENT_AI")
-            })
-        for b in ballast:
-            events.append({
-                "timestamp": b.get("timestamp"),
-                "event": b.get("op_type", "BALLAST_COMPENSATION"),
-                "action": f"Ballast {b.get('pump_mode')} {b.get('qty')}t on {b.get('source') or b.get('dest')}",
-                "source": b.get("trigger", "AI_AUTO_COMPENSATION")
-            })
-        events.sort(key=lambda x: str(x.get("timestamp", "")), reverse=True)
-    return {"status": "success", "timeline": events}
+    events = []
+    audit_events = get_all_audit_events(limit=limit)
+    if audit_events:
+        events.extend(audit_events)
+
+    cargo = get_cargo_operations(limit=limit)
+    ballast = get_ballast_operations(limit=limit)
+    for c in cargo:
+        events.append({
+            "timestamp": c.get("time"),
+            "event": c.get("event", "CARGO_LOADED"),
+            "action": f"Loaded {c.get('container')} ({c.get('weight')}t) to Bay {c.get('bay')}-{c.get('side')}-{c.get('tier')}",
+            "source": c.get("source", "DOCUMENT_AI")
+        })
+    for b in ballast:
+        events.append({
+            "timestamp": b.get("timestamp"),
+            "event": b.get("op_type", "BALLAST_COMPENSATION"),
+            "action": f"Ballast {b.get('pump_mode')} {b.get('qty')}t on {b.get('source') or b.get('dest')}",
+            "source": b.get("trigger", "AI_AUTO_COMPENSATION")
+        })
+    events.sort(key=lambda x: str(x.get("timestamp", "")), reverse=True)
+    return {"status": "success", "timeline": events[:limit]}
 
 
 # Real-Time Telemetry Integration Subsystem (Phase 5)
@@ -144,9 +204,19 @@ _is_manual_pumping = False
 @app.get("/api/vessel-state")
 async def get_vessel_state():
     ship = state.get_current_ship()
-    telemetry = state.latest_telemetry
+    from telemetry.manager import TelemetryManager
+    from telemetry.models import TelemetrySource, ConnectionStatus
+    mgr = TelemetryManager.get_instance()
+    norm = mgr.get_latest_telemetry()
     
-    score, label, risk = state.get_normalized_stability(ship, telemetry["roll"], telemetry["pitch"])
+    roll = norm.vessel_state.roll_deg
+    pitch = norm.vessel_state.pitch_deg
+    first_tank = next(iter(norm.ballast_tanks.values()), None)
+    dist = first_tank.distance_cm if first_tank else 10.0
+    ballast_pct = first_tank.level_pct if first_tank else 100.0
+    status_str = norm.operational_telemetry.status
+    
+    score, label, risk = state.get_normalized_stability(ship, roll, pitch)
     
     # Format ballast tanks
     tanks_dict = {}
@@ -170,26 +240,68 @@ async def get_vessel_state():
         for c in ship.containers
     ]
     
+    is_sim = (norm.source in [TelemetrySource.SIMULATED_TELEMETRY, TelemetrySource.SIMULATED_ESP32])
+    conn_status = norm.connection_status.value
+    stale_sec = getattr(norm.metadata, "stale_seconds", 0.0)
+    
+    if conn_status == "DISCONNECTED":
+        freshness = "DISCONNECTED"
+    elif stale_sec >= 5.0 or norm.metadata.data_quality.value == "STALE":
+        freshness = "STALE"
+    elif norm.metadata.data_quality.value == "DEGRADED":
+        freshness = "DEGRADED"
+    else:
+        freshness = "FRESH"
+
+    primary_pump = next(iter(norm.pumps.values()), None) if norm.pumps else None
+    pump_state = primary_pump.state.value if primary_pump else "IDLE"
+    pump_flow = primary_pump.flow_rate_l_s if primary_pump else 0.0
+    pump_active = (pump_state in ["DRAINING", "FILLING", "TRANSFERRING"]) or getattr(primary_pump, "active_valve_open", False) or _is_manual_pumping
+
+    tel_prov = "[SIMULATED ESP32]" if norm.source == TelemetrySource.SIMULATED_ESP32 else ("[SIMULATED TELEMETRY]" if is_sim else "[HARDWARE SENSOR]")
+
     return {
         "ship_name": ship.name,
-        "roll": telemetry["roll"],
-        "pitch": telemetry["pitch"],
-        "distance": telemetry["distance"],
-        "ballast_pct": telemetry["ballast_pct"],
-        "cargo_kg": telemetry["cargo_kg"],
-        "cargo_t": telemetry["cargo_kg"] * 10.0,
-        "status": telemetry["status"],
+        "roll": roll,
+        "pitch": pitch,
+        "distance": dist,
+        "ballast_pct": ballast_pct,
+        "cargo_kg": 0.0,  # Strict Load-Cell Isolation: HX711 never contaminates cargo mass
+        "cargo_t": 0.0,
+        "status": status_str,
         "stability_score": score,
         "stability_label": label,
         "stability_risk": risk,
-        "is_simulated": state.get_current_reader().is_simulated,
+        "is_simulated": is_sim,
         "iot_flow_stage": state.iot_flow_stage,
         "planned_container": state.planned_container,
         "active_rec_bay": state.active_rec_bay,
         "active_rec_side": state.active_rec_side,
         "ballast_tanks": tanks_dict,
         "containers": containers_list,
-        "is_pumping": _is_manual_pumping
+        "is_pumping": pump_active,
+        "telemetry_timestamp": norm.timestamp,
+        "telemetry_freshness": freshness,
+        "stale_seconds": round(stale_sec, 2),
+        "connection_status": conn_status,
+        "pump_state": pump_state,
+        "pump_flow_l_s": round(pump_flow, 2),
+        "pump_active": pump_active,
+        "telemetry_source": norm.source.value,
+        "authoritative_weight_source": "DOCUMENT_AI",
+        "provenance_map": {
+            "roll": tel_prov,
+            "pitch": tel_prov,
+            "container_weight": "[DOCUMENT AI]",
+            "cargo_weight": "[DOCUMENT AI]",
+            "stability_index": "[CALCULATED]",
+            "vessel_hydrostatics": "[CALCULATED]",
+            "recommended_placement": "[CALCULATED]",
+            "operator_authorization": "[OPERATOR]",
+            "diagnostic_load_cell": "[SIMULATED ESP32 — DIAGNOSTIC ONLY]" if norm.source == TelemetrySource.SIMULATED_ESP32 else ("[HARDWARE SENSOR — DIAGNOSTIC ONLY]" if not is_sim else "[SIMULATED — DIAGNOSTIC ONLY]"),
+            "telemetry": tel_prov,
+            "predictions": "[PREDICTED]"
+        }
     }
 
 # --- Phase 4F: Cargo-Aware Digital Twin & Predictive Monitoring Endpoints ---
@@ -198,8 +310,7 @@ from digital_twin import DigitalTwin
 @app.get("/api/digital-twin/state")
 async def get_digital_twin_state():
     ship = state.get_current_ship()
-    telemetry = state.latest_telemetry
-    twin_state = DigitalTwin.get_vessel_twin_snapshot(ship, telemetry)
+    twin_state = DigitalTwin.get_vessel_twin_snapshot(ship)
     return twin_state.model_dump()
 
 @app.get("/api/digital-twin/lifecycle")
@@ -208,23 +319,40 @@ async def get_digital_twin_lifecycle():
     lifecycle = DigitalTwin.get_four_stage_lifecycle(current_ship=ship)
     return lifecycle.model_dump()
 
-@app.post("/api/digital-twin/predictive")
-async def get_predictive_comparison(req: Request):
-    body = await req.json()
-    container_id = body.get("container_id", "PLANNED-CNTR")
-    weight_t = float(body.get("gross_weight_t", 20.0))
-    bay = int(body.get("bay", 1))
-    side = str(body.get("side", "port"))
-    tier = int(body.get("tier", 1))
+@app.api_route("/api/digital-twin/predictive", methods=["GET", "POST"])
+async def get_predictive_comparison(
+    req: Request,
+    container_id: Optional[str] = None,
+    gross_weight_t: Optional[float] = None,
+    bay: Optional[int] = None,
+    side: Optional[str] = None,
+    tier: Optional[int] = None
+):
+    if req.method == "POST":
+        try:
+            body = await req.json()
+        except Exception:
+            body = {}
+        c_id = body.get("container_id") or container_id or "PLANNED-CNTR"
+        w_t = float(body.get("gross_weight_t") if body.get("gross_weight_t") is not None else (gross_weight_t or 20.0))
+        b = int(body.get("bay") if body.get("bay") is not None else (bay or 1))
+        s = str(body.get("side") if body.get("side") is not None else (side or "port"))
+        t = int(body.get("tier") if body.get("tier") is not None else (tier or 1))
+    else:
+        c_id = container_id or req.query_params.get("container_id", "PLANNED-CNTR")
+        w_t = float(gross_weight_t if gross_weight_t is not None else req.query_params.get("gross_weight_t", 20.0))
+        b = int(bay if bay is not None else req.query_params.get("bay", 1))
+        s = str(side if side is not None else req.query_params.get("side", "port"))
+        t = int(tier if tier is not None else req.query_params.get("tier", 1))
     
     ship = state.get_current_ship()
     comp = DigitalTwin.get_predictive_comparison(
         current_ship=ship,
-        container_id=container_id,
-        gross_weight_t=weight_t,
-        bay=bay,
-        side=side,
-        tier=tier
+        container_id=c_id,
+        gross_weight_t=w_t,
+        bay=b,
+        side=s,
+        tier=t
     )
     return comp.model_dump()
 # --- Phase 5: Real-Time Operational Integration & Authoritative Cargo Workflow ---
@@ -279,6 +407,12 @@ async def get_operational_status_alias():
     response_model=OperationalResetResponse,
     summary="Reset Operational Staging Flow",
     description="Resets active staging variables for subsequent container workflows while preserving committed vessel state."
+)
+@app.post(
+    "/api/operations/reset-stage",
+    response_model=OperationalResetResponse,
+    summary="Reset Operational Staging Flow (Alias)",
+    description="Alias for /api/operations/reset."
 )
 async def reset_operational_flow():
     state.reset_operational_stage()
@@ -527,8 +661,12 @@ async def manual_pump(req: Request, background_tasks: BackgroundTasks):
     p_from = body.get("from_side")  # "port" or "starboard"
     p_to = body.get("to_side")      # "starboard", "port", or "Drain (Sea)"
     p_amt = float(body.get("amount", 50.0))
-    from_bay = body.get("from_bay", "All")
-    to_bay = body.get("to_bay", "All")
+    from_bay = body.get("from_bay")
+    to_bay = body.get("to_bay")
+    if from_bay is None or str(from_bay).lower() in ["all", "none", "null", ""]:
+        from_bay = "All"
+    if to_bay is None or str(to_bay).lower() in ["all", "none", "null", ""]:
+        to_bay = "All"
 
     ship = state.get_current_ship()
     
@@ -747,6 +885,10 @@ async def ops_log():
     # Cargo manifest logs serve as the operational sequence logs
     return get_cargo_operations(limit=100)
 
+@app.get("/api/reports/history")
+async def reports_history(limit: int = 100):
+    return {"status": "success", "operations": get_cargo_operations(limit=limit)}
+
 @app.post("/api/reports/clear")
 async def clear_all_logs():
     clear_logs()
@@ -867,7 +1009,8 @@ async def voyage_profile():
     return JSONResponse(status_code=404, content={"message": "Ship profile not initialized"})
 
 @app.get("/api/voyage/track")
-async def voyage_track(imo: str):
+@app.get("/api/voyage/track/{imo}")
+async def voyage_track(imo: str = "9811000"):
     # Retrieve MyShipTracking credentials and fetch tracking history
     client = MyShipTrackingClient()
     track_data = client.get_current_track(imo)

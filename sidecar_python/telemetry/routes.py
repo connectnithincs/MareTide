@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/telemetry", tags=["Real-Time Telemetry Subsystem
 
 
 class SourceSelectRequest(BaseModel):
-    source: TelemetrySource = Field(..., description="'HARDWARE_SENSOR' or 'SIMULATED_TELEMETRY'")
+    source: str = Field(..., description="'HARDWARE_SENSOR' / 'real_esp32', 'SIMULATED_ESP32' / 'virtual_esp32', or 'SIMULATED_TELEMETRY' / 'simulation'")
     port: Optional[str] = Field(default=None, description="Optional serial COM port name (e.g. 'COM3', '/dev/ttyUSB0')")
 
 
@@ -92,10 +92,12 @@ async def select_telemetry_source(req: SourceSelectRequest):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to switch telemetry source.")
 
+    active_adapter = mgr.get_active_adapter()
     return {
         "success": True,
-        "message": f"Telemetry source switched to {req.source.value}",
-        "active_source": req.source.value,
+        "message": f"Telemetry source switched to {active_adapter.source_type.value}",
+        "active_source": active_adapter.source_type.value,
+        "active_adapter_id": active_adapter.adapter_id,
         "port": req.port
     }
 
@@ -145,3 +147,56 @@ async def validate_telemetry_packet(req: TelemetryValidateRequest):
         strict_load_cell_check=req.strict_load_cell_check
     )
     return result
+
+
+class VirtualScenarioRequest(BaseModel):
+    scenario: str = Field(..., description="One of: 'STABLE', 'PORT_LIST', 'STARBOARD_LIST', 'FORWARD_PITCH', 'AFT_PITCH', 'TANK_FILLING', 'TANK_DRAINING', 'SENSOR_FAULT', 'DISCONNECTED'")
+
+
+class VirtualCommandRequest(BaseModel):
+    command: str = Field(..., description="Serial command to send to virtual microcontroller (e.g. 'DRAIN:2.50')")
+
+
+@router.get(
+    "/virtual/status",
+    summary="Get Virtual ESP32 Firmware State",
+    description="Returns internal diagnostic registers, pin states (LEDs, Servo), and active scenario from the Virtual ESP32 emulator."
+)
+async def get_virtual_esp32_status():
+    mgr = TelemetryManager.get_instance()
+    state_dict = mgr.get_virtual_firmware_state()
+    return {
+        "success": True,
+        "firmware_state": state_dict
+    }
+
+
+@router.post(
+    "/virtual/scenario",
+    summary="Set Virtual ESP32 Scenario",
+    description="Switches the active physical perturbation scenario on the Virtual ESP32 emulator."
+)
+async def set_virtual_esp32_scenario(req: VirtualScenarioRequest):
+    mgr = TelemetryManager.get_instance()
+    success = mgr.set_virtual_scenario(req.scenario)
+    if not success:
+        raise HTTPException(status_code=400, detail=f"Invalid scenario '{req.scenario}'. Allowed: STABLE, PORT_LIST, STARBOARD_LIST, FORWARD_PITCH, AFT_PITCH, TANK_FILLING, TANK_DRAINING, SENSOR_FAULT, DISCONNECTED")
+    return {
+        "success": True,
+        "message": f"Virtual ESP32 scenario switched to {req.scenario.upper()}",
+        "scenario": req.scenario.upper()
+    }
+
+
+@router.post(
+    "/virtual/command",
+    summary="Send Command to Virtual ESP32",
+    description="Sends an incoming UART serial command to the Virtual ESP32 (e.g. 'DRAIN:2.50')."
+)
+async def send_virtual_esp32_command(req: VirtualCommandRequest):
+    mgr = TelemetryManager.get_instance()
+    mgr.send_virtual_command(req.command)
+    return {
+        "success": True,
+        "message": f"Command '{req.command}' dispatched to Virtual ESP32"
+    }

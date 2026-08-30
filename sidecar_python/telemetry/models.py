@@ -18,6 +18,7 @@ class TelemetrySource(str, Enum):
     """Permitted telemetry provenance sources."""
     HARDWARE_SENSOR = "HARDWARE_SENSOR"
     SIMULATED_TELEMETRY = "SIMULATED_TELEMETRY"
+    SIMULATED_ESP32 = "SIMULATED_ESP32"
     SYSTEM_DERIVED = "SYSTEM_DERIVED"
 
 
@@ -27,7 +28,9 @@ class ConnectionStatus(str, Enum):
     DISCONNECTED = "DISCONNECTED"
     STALE = "STALE"
     DEGRADED = "DEGRADED"
+    INVALID_DATA = "INVALID_DATA"
     SIMULATED = "SIMULATED"
+    HARDWARE = "HARDWARE"
 
 
 class DataQuality(str, Enum):
@@ -156,6 +159,14 @@ class NormalizedTelemetry(BaseModel):
     metadata: TelemetryMetadata = Field(
         default_factory=TelemetryMetadata,
         description="Provenance and data quality metadata"
+    )
+    provenance_map: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Component-level provenance tagging map"
+    )
+    diagnostic_load_cell_kg: Optional[float] = Field(
+        None,
+        description="Diagnostic load-cell reading quarantined from cargo & stability calculations"
     )
 
 

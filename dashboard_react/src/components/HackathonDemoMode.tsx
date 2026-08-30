@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import {
   Sparkles,
   Play,
@@ -26,20 +25,7 @@ import {
   Scale
 } from "lucide-react";
 import { CargoAwareDigitalTwin } from "./CargoAwareDigitalTwin";
-
-const API_BASE = "http://localhost:8000";
-
-interface DemoScenario {
-  id: string;
-  title: string;
-  subtitle: string;
-  filename: string;
-  category: "GOLDEN_PATH" | "ANOMALY_REJECTION" | "VALIDATION_WARNING" | "HEAVY_CARGO";
-  container_number: string;
-  expected_result: string;
-  description: string;
-  tags: string[];
-}
+import { containerAPI, digitalTwinAPI, reportsAPI, type DemoScenario } from "../utils/api";
 
 export const HackathonDemoMode: React.FC = () => {
   const [scenarios, setScenarios] = useState<DemoScenario[]>([]);
@@ -67,34 +53,34 @@ export const HackathonDemoMode: React.FC = () => {
 
   const fetchScenarios = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/container/demo/fixtures`);
-      if (res.data && res.data.scenarios) {
-        setScenarios(res.data.scenarios);
-        if (res.data.scenarios.length > 0) {
-          setSelectedScenario(res.data.scenarios[0]);
+      const res = await containerAPI.getDemoFixtures();
+      if (res && res.scenarios) {
+        setScenarios(res.scenarios);
+        if (res.scenarios.length > 0) {
+          setSelectedScenario(res.scenarios[0]);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load demo scenarios:", err);
     }
   };
 
   const refreshLiveTwin = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/twin/vessel-state`);
-      setLiveTwin(res.data);
-    } catch (err) {
+      const data = await digitalTwinAPI.getState();
+      setLiveTwin(data);
+    } catch (err: any) {
       console.error("Failed to fetch live twin:", err);
     }
   };
 
   const fetchAuditLogs = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/reports/timeline?limit=10`);
-      if (res.data && res.data.timeline) {
-        setAuditLogs(res.data.timeline);
+      const res = await reportsAPI.getTimeline(10);
+      if (res && res.timeline) {
+        setAuditLogs(res.timeline);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to fetch audit logs:", err);
     }
   };
@@ -103,7 +89,7 @@ export const HackathonDemoMode: React.FC = () => {
     setLoading(true);
     setStatusMessage("Resetting vessel state and audit logs to baseline...");
     try {
-      await axios.post(`${API_BASE}/api/container/demo/reset`);
+      await containerAPI.resetDemo();
       setCurrentStep(1);
       setExtraction(null);
       setStowagePlan(null);
@@ -115,8 +101,9 @@ export const HackathonDemoMode: React.FC = () => {
       await refreshLiveTwin();
       await fetchAuditLogs();
       setStatusMessage("Demo environment reset complete. Vessel at initial equilibrium.");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Reset failed:", err);
+      setStatusMessage(`Reset error: ${err.message || "Failed to reset demo"}`);
     } finally {
       setLoading(false);
     }
@@ -129,26 +116,20 @@ export const HackathonDemoMode: React.FC = () => {
     setStatusMessage(`Downloading ${selectedScenario.filename} and executing Document AI OCR...`);
     try {
       // 1. Fetch fixture image as blob
-      const imgRes = await axios.get(
-        `${API_BASE}/api/container/demo/fixtures/${selectedScenario.filename}/image`,
-        { responseType: "blob" }
-      );
-      const imageBlob = imgRes.data;
+      const imageBlob = await containerAPI.getDemoFixtureImage(selectedScenario.filename);
 
       // 2. Submit to extraction endpoint
       const formData = new FormData();
       formData.append("file", imageBlob, selectedScenario.filename);
 
-      const ocrRes = await axios.post(`${API_BASE}/api/container/extract`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      const ocrRes = await containerAPI.extract(formData);
 
-      setExtraction(ocrRes.data);
+      setExtraction(ocrRes);
       setCurrentStep(2); // Advanced to Extraction Inspection
       setStatusMessage("Document AI OCR complete. Reviewing extracted fields & ISO 6346 checks.");
     } catch (err: any) {
       console.error("OCR Extraction failed:", err);
-      setStatusMessage(`Document AI Extraction error: ${err.message}`);
+      setStatusMessage(`Document AI Extraction error: ${err.message || "Extraction failed"}`);
     } finally {
       setLoading(false);
     }
@@ -174,13 +155,13 @@ export const HackathonDemoMode: React.FC = () => {
         validation: extraction.validation
       };
 
-      const res = await axios.post(`${API_BASE}/api/containers/analyze-stability`, payload);
-      setStowagePlan(res.data);
+      const res = await containerAPI.analyzeStability(payload);
+      setStowagePlan(res);
       setCurrentStep(3); // Advanced to Stowage Plan
       setStatusMessage("Stowage optimization complete. Awaiting Chief Officer authorization.");
     } catch (err: any) {
       console.error("Stowage analysis failed:", err);
-      setStatusMessage(`Optimization error: ${err.message}`);
+      setStatusMessage(`Optimization error: ${err.message || "Stowage solver failed"}`);
     } finally {
       setLoading(false);
     }
@@ -201,8 +182,8 @@ export const HackathonDemoMode: React.FC = () => {
         operator_id: "ChiefOfficer_Demo"
       };
 
-      const res = await axios.post(`${API_BASE}/api/containers/confirm-and-load`, payload);
-      setLoadedResult(res.data);
+      const res = await containerAPI.confirmAndLoad(payload);
+      setLoadedResult(res);
       setOperatorAuthorized(true);
       setCurrentStep(4); // Advanced to Loaded & Digital Twin
       await refreshLiveTwin();
@@ -210,10 +191,10 @@ export const HackathonDemoMode: React.FC = () => {
       setStatusMessage("Container committed to live twin. Calculating required ballast compensation.");
 
       // Auto-compute Ballast recommendation
-      await handleCalculateBallast(res.data);
+      await handleCalculateBallast(res);
     } catch (err: any) {
       console.error("Loading commit failed:", err);
-      setStatusMessage(`Commit error: ${err.message}`);
+      setStatusMessage(`Commit error: ${err.message || "Loading commit failed"}`);
     } finally {
       setLoading(false);
     }
@@ -230,9 +211,9 @@ export const HackathonDemoMode: React.FC = () => {
         tier: loadedData.loaded_position?.tier || stowagePlan?.recommendation?.tier
       };
 
-      const res = await axios.post(`${API_BASE}/api/containers/ballast-compensation`, payload);
-      setBallastPlan(res.data);
-    } catch (err) {
+      const res = await containerAPI.calculateBallastCompensation(payload);
+      setBallastPlan(res);
+    } catch (err: any) {
       console.error("Ballast calculation error:", err);
     }
   };
@@ -247,15 +228,15 @@ export const HackathonDemoMode: React.FC = () => {
       const payload = {
         container_number: loadedResult?.container?.container_number,
         tank_key: targetTank.toLowerCase().replace("-", "_"),
-        direction: ballastPlan.direction || "DRAIN",
+        direction: (ballastPlan.direction || "DRAIN") as "DRAIN" | "FILL" | "TRANSFER",
         qty_t: ballastPlan.required_qty_t,
         operator_confirmed: true,
         operator_id: "ChiefOfficer_Demo"
       };
 
-      const res = await axios.post(`${API_BASE}/api/containers/execute-ballast`, payload);
+      const res = await containerAPI.executeBallastCompensation(payload);
 
-      setBallastResult(res.data);
+      setBallastResult(res);
       setBallastAuthorized(true);
       setCurrentStep(5); // Final Certified Equilibrium & Audit
       await refreshLiveTwin();
@@ -263,7 +244,7 @@ export const HackathonDemoMode: React.FC = () => {
       setStatusMessage("Ballast compensation executed. Vessel restored to safe hydrostatic equilibrium.");
     } catch (err: any) {
       console.error("Ballast execution error:", err);
-      setStatusMessage(`Ballast execution error: ${err.message}`);
+      setStatusMessage(`Ballast execution error: ${err.message || "Ballast pump execution failed"}`);
     } finally {
       setLoading(false);
     }

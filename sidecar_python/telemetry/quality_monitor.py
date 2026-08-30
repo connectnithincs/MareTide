@@ -88,7 +88,14 @@ class TelemetryQualityMonitor:
                 current_telemetry.metadata.warnings.append(warning_msg)
             return current_telemetry
 
-        # 2. Stale Detection
+        # 2. Invalid Data Detection
+        if current_telemetry.metadata.validation_status == "INVALID":
+            current_telemetry.connection_status = ConnectionStatus.INVALID_DATA
+            current_telemetry.metadata.data_quality = DataQuality.INVALID
+            current_telemetry.metadata.stale_seconds = round(age, 2)
+            return current_telemetry
+
+        # 3. Stale Detection
         if age > self.stale_threshold_sec:
             if current_telemetry.connection_status != ConnectionStatus.STALE:
                 self.stale_count += 1
@@ -100,7 +107,15 @@ class TelemetryQualityMonitor:
                 current_telemetry.metadata.warnings.append(warning_msg)
             return current_telemetry
 
-        # 3. Frozen Sensor Check (only on live hardware feeds)
+        # 4. Hardware Connection Status
+        if current_telemetry.source == TelemetrySource.HARDWARE_SENSOR:
+            current_telemetry.connection_status = ConnectionStatus.CONNECTED
+        elif current_telemetry.source == TelemetrySource.SIMULATED_ESP32:
+            current_telemetry.connection_status = ConnectionStatus.CONNECTED
+        else:
+            current_telemetry.connection_status = ConnectionStatus.SIMULATED
+
+        # 5. Frozen Sensor Check (only on live hardware feeds)
         if current_telemetry.source == TelemetrySource.HARDWARE_SENSOR and len(self._roll_history) == self.frozen_window_size:
             roll_variance = max(self._roll_history) - min(self._roll_history)
             pitch_variance = max(self._pitch_history) - min(self._pitch_history)

@@ -693,7 +693,10 @@ class ContainerLoadingService:
         weights_data = container_data.get("weights") or {}
         gross_kg = weights_data.get("gross_weight_kg")
         if gross_kg is None:
-            gross_kg = container_data.get("gross_weight_kg") or container_data.get("weight")
+            if container_data.get("gross_weight_t") is not None and float(container_data.get("gross_weight_t", 0)) > 0:
+                gross_kg = float(container_data.get("gross_weight_t")) * 1000.0
+            else:
+                gross_kg = container_data.get("gross_weight_kg") or container_data.get("weight")
 
         gross_t = round(float(gross_kg) / 1000.0, 2) if (gross_kg is not None and gross_kg > 0) else 0.0
         container_type = container_data.get("container_type")

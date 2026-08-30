@@ -73,12 +73,27 @@ The application is built as a microservices stack run simultaneously via an orch
 
 ---
 
+### 6. 🛰️ Real ESP32 Hardware Telemetry Integration
+* **Microcontroller Firmware:** [`esp32_sensor_sketch.ino`](file:///e:/HACKPROJ/MareTide%20Js/esp32_sensor_sketch.ino)
+* **Baud Rate:** `115200` bps over USB UART.
+* **Connected Sensors:** MPU-6050 (I2C SDA:21, SCL:22) for roll/pitch inclinometer, HC-SR04 (Trig:5, Echo:18) for ultrasonic ballast level depth, and SG90 servo (PWM:25) for ballast gate valve.
+* **Multi-Line Stream Extraction:** Custom serial stream scanner seamlessly decodes multi-line JSON blocks, `---` block separators, and filters asynchronous boot/warning text without dropping packets.
+* **Strict Load-Cell Isolation:** The HX711 scale interface on the ESP32 is quarantined and isolated from container cargo mass, gross weight, VGM, and stability calculations. Cargo mass is sourced strictly from SOLAS Document AI.
+
+---
+
 ## 🚀 Setup & Launch
 
 ### Prerequisites
 * **Node.js** (v18+)
 * **Python 3.10+** (with virtual environment capability)
-* **ESP32 Dev Board** (Optional, for physical load scale testing)
+* **ESP32 Dev Board** (ESP32-WROOM-32 with MPU-6050 & HC-SR04)
+
+### ESP32 Hardware Setup
+1. Open `esp32_sensor_sketch.ino` in Arduino IDE or PlatformIO.
+2. Select **ESP32 Dev Module** and the connected COM port.
+3. Flash the firmware at 115200 baud.
+4. In MareTide Dashboard **Settings > IoT Telemetry Link**, select **ESP32 Physical Port Link** and establish connection.
 
 ### Installation
 1. Install Node dependencies:
@@ -102,4 +117,12 @@ Open your browser and navigate to:
 ```url
 http://localhost:3000
 ```
-*(Default login credentials are managed through the Flask Auth server interface)*
+*(Default login credentials: `admin@maretide.com` / `password123`)*
+
+---
+
+## 📚 Technical Documentation
+* [ESP32 Sensor Audit](file:///e:/HACKPROJ/MareTide%20Js/docs/ESP32_SENSOR_AUDIT.md)
+* [ESP32 Sensor Calibration Guide](file:///e:/HACKPROJ/MareTide%20Js/docs/ESP32_SENSOR_CALIBRATION.md)
+* [ESP32 Hardware Integration Runbook](file:///e:/HACKPROJ/MareTide%20Js/docs/ESP32_INTEGRATION.md)
+

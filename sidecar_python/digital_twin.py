@@ -138,8 +138,10 @@ class DigitalTwin:
                     telemetry_freshness = "FRESH"
 
                 if is_simulated is None:
-                    is_simulated = (norm_telemetry.source.value == "SIMULATED_TELEMETRY")
-                telemetry_source = "SIMULATED_TELEMETRY" if is_simulated else "HARDWARE_SENSOR"
+                    is_simulated = (norm_telemetry.source.value in ["SIMULATED_TELEMETRY", "SIMULATED_ESP32"])
+                    telemetry_source = norm_telemetry.source.value if hasattr(norm_telemetry.source, "value") else str(norm_telemetry.source)
+                else:
+                    telemetry_source = "SIMULATED_TELEMETRY" if is_simulated else "HARDWARE_SENSOR"
 
                 # Pump telemetry
                 pumps_dict = getattr(norm_telemetry, "pumps", {})
@@ -192,9 +194,9 @@ class DigitalTwin:
 
             if is_simulated is None:
                 telemetry_source = telemetry.source.value if hasattr(telemetry.source, "value") else str(telemetry.source)
-                is_simulated = (telemetry_source == "SIMULATED_TELEMETRY")
+                is_simulated = (telemetry_source in ["SIMULATED_TELEMETRY", "SIMULATED_ESP32"])
             else:
-                telemetry_source = "SIMULATED_TELEMETRY" if is_simulated else "HARDWARE_SENSOR"
+                telemetry_source = telemetry.source.value if hasattr(telemetry, "source") else ("SIMULATED_TELEMETRY" if is_simulated else "HARDWARE_SENSOR")
 
             pumps_dict = getattr(telemetry, "pumps", {})
             if pumps_dict and isinstance(pumps_dict, dict):
@@ -245,10 +247,19 @@ class DigitalTwin:
             telemetry_source = "SIMULATED_TELEMETRY" if is_simulated else "HARDWARE_SENSOR"
 
         # 5. Build explicit multi-layer provenance mapping
+        tel_prov = "[SIMULATED ESP32]" if telemetry_source == "SIMULATED_ESP32" else ("[SIMULATED TELEMETRY]" if is_simulated else "[HARDWARE SENSOR]")
+        diag_load_prov = "[SIMULATED ESP32 — DIAGNOSTIC ONLY]" if telemetry_source == "SIMULATED_ESP32" else ("[HARDWARE SENSOR — DIAGNOSTIC ONLY]" if not is_simulated else "[SIMULATED — DIAGNOSTIC ONLY]")
         provenance_map = {
+            "roll": tel_prov,
+            "pitch": tel_prov,
+            "container_weight": "[DOCUMENT AI]",
             "cargo_weight": "[DOCUMENT AI]",
+            "stability_index": "[CALCULATED]",
             "vessel_hydrostatics": "[CALCULATED]",
-            "telemetry": "[SIMULATED TELEMETRY]" if is_simulated else "[HARDWARE SENSOR]",
+            "recommended_placement": "[CALCULATED]",
+            "operator_authorization": "[OPERATOR]",
+            "diagnostic_load_cell": diag_load_prov,
+            "telemetry": tel_prov,
             "predictions": "[PREDICTED]"
         }
 

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
+import { vesselAPI } from "../utils/api";
 
 export interface VesselState {
   ship_name: string;
@@ -63,11 +64,13 @@ export interface VesselState {
 interface SocketContextProps {
   connected: boolean;
   vesselState: VesselState | null;
+  refetchVesselState: () => Promise<VesselState | null>;
 }
 
 const SocketContext = createContext<SocketContextProps>({
   connected: false,
-  vesselState: null
+  vesselState: null,
+  refetchVesselState: async () => null
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -77,17 +80,36 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [vesselState, setVesselState] = useState<VesselState | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const refetchVesselState = useCallback(async (): Promise<VesselState | null> => {
+    try {
+      const state = await vesselAPI.getState();
+      if (state) {
+        setVesselState(state as unknown as VesselState);
+        return state as unknown as VesselState;
+      }
+    } catch (err) {
+      console.warn("Failed direct vessel state fetch:", err);
+    }
+    return null;
+  }, []);
+
+  // Initial HTTP fetch on mount so UI renders immediately without waiting for WS message
+  useEffect(() => {
+    refetchVesselState();
+  }, [refetchVesselState]);
+
+  // WebSocket connection management with automatic reconnection
   useEffect(() => {
     let connectTimeout: number;
+    let fallbackPollInterval: number;
 
     const connect = () => {
-      console.log("Connecting to telemetry WebSocket...");
       const ws = new WebSocket("ws://localhost:8000/ws/telemetry");
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log("Telemetry WebSocket connected.");
         setConnected(true);
+        window.clearInterval(fallbackPollInterval);
       };
 
       ws.onmessage = (event) => {
@@ -100,8 +122,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       };
 
       ws.onclose = () => {
-        console.log("Telemetry WebSocket disconnected. Retrying in 3s...");
         setConnected(false);
+        // Start conservative fallback polling (every 2.5s) while WS is offline
+        window.clearInterval(fallbackPollInterval);
+        fallbackPollInterval = window.setInterval(() => {
+          refetchVesselState();
+        }, 2500);
+
         connectTimeout = window.setTimeout(connect, 3000);
       };
 
@@ -114,15 +141,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     connect();
 
     return () => {
-      clearTimeout(connectTimeout);
+      window.clearTimeout(connectTimeout);
+      window.clearInterval(fallbackPollInterval);
       if (wsRef.current) {
         wsRef.current.close();
       }
     };
-  }, []);
+  }, [refetchVesselState]);
 
   return (
-    <SocketContext.Provider value={{ connected, vesselState }}>
+    <SocketContext.Provider value={{ connected, vesselState, refetchVesselState }}>
       {children}
     </SocketContext.Provider>
   );

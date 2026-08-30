@@ -36,6 +36,16 @@ class ContainerSlipService:
             self._engine = get_ocr_engine(selected_name)
         return self._engine
 
+    def warmup(self):
+        """Pre-warms OCR ONNX models to eliminate cold-start latency."""
+        try:
+            engine = self.get_engine()
+            dummy = np.zeros((64, 64, 3), dtype=np.uint8)
+            engine.recognize(dummy)
+        except Exception:
+            pass
+
+
 
     def process_image(
         self,

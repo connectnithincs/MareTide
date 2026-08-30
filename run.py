@@ -32,15 +32,18 @@ def cleanup_ports(ports=[5000, 8000, 8001, 3000]):
     if os.name == "nt":
         for port in ports:
             try:
-                out = subprocess.check_output(f'netstat -ano | findstr LISTENING | findstr :{port}', shell=True, text=True, stderr=subprocess.DEVNULL)
+                out = subprocess.check_output(f'netstat -ano | findstr :{port}', shell=True, text=True, stderr=subprocess.DEVNULL)
                 for line in out.strip().splitlines():
-                    parts = line.strip().split()
-                    if len(parts) >= 5:
-                        pid = parts[-1]
-                        if pid.isdigit() and int(pid) != os.getpid():
-                            subprocess.run(f"taskkill /F /PID {pid}", shell=True, capture_output=True)
+                    if "LISTENING" in line:
+                        parts = line.strip().split()
+                        if len(parts) >= 5:
+                            pid = parts[-1]
+                            if pid.isdigit() and int(pid) != os.getpid() and int(pid) != 0:
+                                subprocess.run(f"taskkill /F /PID {pid}", shell=True, capture_output=True)
             except Exception:
                 pass
+        time.sleep(1)
+
 
 def kill_proc_tree(proc):
     if proc.poll() is None:
@@ -65,11 +68,12 @@ def wait_for_ready(url, name, timeout=30):
     while time.time() - start_time < timeout:
         for u in test_urls:
             try:
-                req = urllib.request.Request(u, headers={'User-Agent': 'MareTide Poller'})
-                with urllib.request.urlopen(req, timeout=1) as response:
+                req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Connection': 'close'})
+                with urllib.request.urlopen(req, timeout=1.5) as response:
                     if response.getcode() in [200, 302, 404]:
                         print(" Ready!")
                         return True
+
             except urllib.error.HTTPError as e:
                 # 404/401 is fine, it means the server is running and routing
                 if e.code in [404, 401, 400]:

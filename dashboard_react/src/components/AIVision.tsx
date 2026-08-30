@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { visionAPI } from "../utils/api";
-import { Eye, ShieldAlert, Video, RefreshCw, ToggleLeft, ToggleRight, Camera } from "lucide-react";
+import { visionAPI, API_BASE } from "../utils/api";
+import { Eye, ShieldAlert, Video, RefreshCw, Camera, CheckCircle2 } from "lucide-react";
+import { SectionHeader } from "./ui/SectionHeader";
+import { StatusBadge } from "./ui/StatusBadge";
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return "";
@@ -22,29 +24,6 @@ const formatTimestamp = (ts: any) => {
   return date.toTimeString().split(" ")[0];
 };
 
-const getAuthenticatedUrl = (url: string, user: string, pass: string) => {
-  if (!url) return "";
-  if (!user || !pass) return url;
-  
-  const cleanUrl = url.trim();
-  const cleanUser = encodeURIComponent(user.trim());
-  const cleanPass = encodeURIComponent(pass.trim());
-  
-  // Check if it already has credentials in the URL
-  if (cleanUrl.includes("@") && (cleanUrl.startsWith("http") || cleanUrl.startsWith("rtsp"))) {
-    return cleanUrl;
-  }
-  
-  const protocolMatch = cleanUrl.match(/^(https?:\/\/|rtsp:\/\/)/i);
-  if (protocolMatch) {
-    const protocol = protocolMatch[0];
-    const rest = cleanUrl.substring(protocol.length);
-    return `${protocol}${cleanUser}:${cleanPass}@${rest}`;
-  }
-  
-  return `http://${cleanUser}:${cleanPass}@${cleanUrl}`;
-};
-
 export const AIVision: React.FC = () => {
   const [cameras, setCameras] = useState<{ [key: string]: boolean }>({
     crew_safety: true,
@@ -56,11 +35,17 @@ export const AIVision: React.FC = () => {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScenario, setSelectedScenario] = useState("Normal Voyage");
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const showFeedback = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(null), 3000);
+  };
 
   const handleTriggerScenario = async () => {
     try {
       await visionAPI.setScenario(selectedScenario);
-      alert(`Simulation scenario triggered: ${selectedScenario}`);
+      showFeedback(`Simulation scenario triggered: ${selectedScenario}`);
       await fetchStatus();
     } catch (err) {
       console.error(err);
@@ -71,7 +56,7 @@ export const AIVision: React.FC = () => {
     try {
       await visionAPI.clearAlerts();
       setAlerts([]);
-      alert("Alert history cleared!");
+      showFeedback("Alert history cleared!");
     } catch (err) {
       console.error(err);
     }
@@ -99,221 +84,131 @@ export const AIVision: React.FC = () => {
 
   useEffect(() => {
     fetchStatus();
-    // Poll alerts every 3 seconds for active UI updates
-    const interval = setInterval(async () => {
-      try {
-        const alertLogs = await visionAPI.getAlerts();
-        setAlerts(alertLogs.slice(0, 15));
-      } catch (err) {}
-    }, 3000);
-
+    const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleToggleCamera = async (camId: string) => {
-    const nextState = !cameras[camId];
-    // Update local state first for instant response
-    setCameras(prev => ({ ...prev, [camId]: nextState }));
-    try {
-      await visionAPI.toggleCamera(camId, nextState);
-    } catch (err) {
-      console.error(err);
-      // Revert state on error
-      setCameras(prev => ({ ...prev, [camId]: !nextState }));
-    }
+  const cameraNames: { [key: string]: string } = {
+    crew_safety: "CAM 01: CREW SAFETY & PPE",
+    sea: "CAM 02: SEA STATE & HORIZON",
+    cargo: "CAM 03: STOWAGE BAY & CRANE",
+    ballast: "CAM 04: DOUBLE-BOTTOM PUMPS"
   };
-
-  const handleToggleSourceMode = async (mode: "simulated" | "live") => {
-    setSourceMode(mode);
-    try {
-      let source: any = 0;
-      if (mode === "live") {
-        const rawUrl = localStorage.getItem("vision_cam_source") || "0";
-        const user = localStorage.getItem("vision_cam_user") || "";
-        const pass = localStorage.getItem("vision_cam_pass") || "";
-        source = getAuthenticatedUrl(rawUrl, user, pass);
-      }
-      await visionAPI.toggleSourceMode(mode, source);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const cameraMetadata = [
-    { id: "crew_safety", label: "Crew Safety Detection", model: "YOLOv8 Live" },
-    { id: "sea", label: "Sea State Monitoring", model: "YOLOv8 Live" },
-    { id: "cargo", label: "Stowage Cargo Security", model: "Simulated overlays" },
-    { id: "ballast", label: "Ballast Leak Monitor", model: "Motion analysis" }
-  ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-brand-dark">
-      {/* Title */}
-      <div className="flex items-center justify-between border-b border-brand-border pb-4">
-        <div>
-          <h2 className="text-xl font-black text-brand-text tracking-wide uppercase">AI Vision Systems</h2>
-          <p className="text-xs text-brand-muted font-semibold mt-1">Surveillance and automated computer vision alert pipelines.</p>
+    <div className="space-y-4 font-mono text-xs">
+      {/* Action feedback message */}
+      {feedback && (
+        <div className="p-2.5 rounded-xl bg-brand-safeBg border border-brand-safe/40 text-brand-safe font-bold flex items-center gap-2 animate-in fade-in duration-150">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>{feedback}</span>
+        </div>
+      )}
+
+      {/* Camera Grid Controls */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 border-b border-brand-borderSubtle gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-brand-muted uppercase font-bold">Scenario:</span>
+          <select
+            value={selectedScenario}
+            onChange={(e) => setSelectedScenario(e.target.value)}
+            className="surface-base border border-brand-border rounded-xl px-2.5 py-1 text-xs text-brand-text focus-ring"
+          >
+            <option value="Normal Voyage" className="bg-brand-elevated text-brand-text">Normal Voyage</option>
+            <option value="Rough Sea" className="bg-brand-elevated text-brand-text">Rough Sea State</option>
+            <option value="Cargo Shift Hazard" className="bg-brand-elevated text-brand-text">Cargo Shift Hazard</option>
+            <option value="Man Overboard" className="bg-brand-elevated text-brand-text">Man Overboard (Safety)</option>
+          </select>
+          <button
+            onClick={handleTriggerScenario}
+            className="px-2.5 py-1 surface-base hover:bg-brand-hover text-brand-cyan border border-brand-cyan/30 rounded-xl text-[10px] font-bold uppercase transition-all shadow-sm"
+          >
+            Trigger
+          </button>
         </div>
 
-        {/* Global Controls */}
-        <div className="flex items-center gap-3 bg-brand-app border border-brand-border p-1.5 rounded-lg text-xs font-bold text-brand-text shadow-sm">
-          <span className="text-[10px] text-brand-muted uppercase font-bold tracking-wider px-2">Webcam Source</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full surface-base text-brand-safe border border-brand-safe/30">
+            YOLOv8 Edge Engine Active
+          </span>
           <button
-            onClick={() => handleToggleSourceMode("simulated")}
-            className={`px-3 py-1.5 rounded transition-all ${
-              sourceMode === "simulated" ? "bg-brand-accent text-slate-950" : "hover:text-brand-text text-brand-muted"
-            }`}
+            onClick={handleClearAlerts}
+            className="text-[10px] text-brand-muted hover:text-brand-danger transition-colors underline"
           >
-            Simulated Loops
-          </button>
-          <button
-            onClick={() => handleToggleSourceMode("live")}
-            className={`px-3 py-1.5 rounded transition-all ${
-              sourceMode === "live" ? "bg-brand-accent text-slate-950" : "hover:text-brand-text text-brand-muted"
-            }`}
-          >
-            Live Webcams
+            Clear Log
           </button>
         </div>
       </div>
 
-      {/* Simulation Scenario Trigger Bar */}
-      {sourceMode === "simulated" && (
-        <div className="border border-brand-border bg-brand-card rounded-xl p-4 shadow-lg glass-panel flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-semibold">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] text-brand-muted uppercase font-bold tracking-wider">Simulation Scenario Selection</span>
-            <select
-              value={selectedScenario}
-              onChange={(e) => setSelectedScenario(e.target.value)}
-              className="bg-brand-app border border-brand-border rounded px-3 py-2 text-brand-text font-bold focus:outline-none focus:border-brand-accent"
-            >
-              <option value="Normal Voyage">Normal Voyage</option>
-              <option value="Cargo Misplacement">Cargo Misplacement</option>
-              <option value="Ballast Leak">Ballast Leak</option>
-              <option value="Crew Intrusion">Crew Intrusion</option>
-              <option value="Sea Obstacle">Sea Obstacle</option>
-            </select>
-          </div>
+      {/* 4 HD Camera Video Matrix */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {Object.entries(cameras).map(([camId, isActive]) => {
+          const streamUrl = `${API_BASE}/video_feed/${camId}?mode=${sourceMode}&t=${Date.now()}`;
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleTriggerScenario}
-              className="px-4 py-2.5 bg-brand-accent hover:bg-brand-accent/90 text-slate-950 rounded-lg uppercase tracking-wider font-extrabold text-xs transition-all flex items-center gap-2 shadow-sm"
+          return (
+            <div 
+              key={camId}
+              className="surface-elevated rounded-2xl border border-brand-borderSubtle overflow-hidden flex flex-col shadow-md group"
             >
-              <ShieldAlert className="w-4 h-4" />
-              <span>Trigger Scenario</span>
-            </button>
-            <button
-              onClick={handleClearAlerts}
-              className="px-4 py-2.5 bg-brand-app hover:bg-brand-border/40 text-brand-text rounded-lg border border-brand-border uppercase tracking-wider font-extrabold text-xs transition-all"
-            >
-              Clear Alerts
-            </button>
-          </div>
-        </div>
-      )}
+              <div className="p-2.5 surface-base border-b border-brand-borderSubtle flex items-center justify-between text-[9.5px] font-bold">
+                <span className="text-brand-text truncate">{cameraNames[camId] || camId}</span>
+                <span className="w-2 h-2 rounded-full bg-brand-safe animate-pulse flex-shrink-0" />
+              </div>
 
-      {loading ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
-          <RefreshCw className="w-8 h-8 text-brand-accent animate-spin" />
-          <span className="text-xs text-brand-muted font-semibold">Warming up YOLOv8 vision pipeline...</span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Cameras Grid (Left 2 cols) */}
-          <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {cameraMetadata.map((cam) => {
-              const enabled = cameras[cam.id];
-              return (
-                <div 
-                  key={cam.id} 
-                  className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-md flex flex-col glass-panel"
-                >
-                  {/* Header bar */}
-                  <div className="px-4 py-3 border-b border-brand-border/60 bg-slate-950/40 flex justify-between items-center text-xs">
-                    <div className="flex items-center gap-2">
-                      <Video className="w-4 h-4 text-brand-accent" />
-                      <div>
-                        <span className="font-extrabold block text-brand-text">{cam.label}</span>
-                        <span className="text-[9px] text-brand-muted uppercase font-black tracking-wide">{cam.model}</span>
-                      </div>
-                    </div>
-                    {/* Toggle Button */}
-                    <button
-                      onClick={() => handleToggleCamera(cam.id)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-bold transition-all ${
-                        enabled 
-                          ? "bg-brand-accentBg border-brand-accent/20 text-brand-accent" 
-                          : "bg-brand-dangerBg border-brand-danger/20 text-brand-danger"
-                      }`}
-                    >
-                      {enabled ? <Camera className="w-3.5 h-3.5" /> : null}
-                      <span>{enabled ? "ACTIVE" : "OFFLINE"}</span>
-                    </button>
-                  </div>
-
-                  {/* Frame Container */}
-                  <div className="aspect-video bg-slate-950 flex items-center justify-center relative overflow-hidden">
-                    {enabled ? (
-                      <img
-                        src={`http://localhost:8001/api/video/${cam.id}?t=${Date.now()}`}
-                        className="w-full h-full object-cover"
-                        alt={cam.label}
-                      />
-                    ) : (
-                      <div className="text-center p-6 flex flex-col items-center justify-center gap-2">
-                        <Eye className="w-8 h-8 text-brand-danger opacity-40" />
-                        <span className="text-xs text-brand-muted font-bold uppercase tracking-wider">
-                          Feed Manually Disabled
-                        </span>
-                      </div>
-                    )}
-                  </div>
+              <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+                {isActive ? (
+                  <img
+                    src={streamUrl}
+                    alt={cameraNames[camId]}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="text-center text-brand-muted text-[10px]">Camera Offline</div>
+                )}
+                {/* HUD Camera Crosshair Overlay */}
+                <div className="absolute inset-0 border border-brand-cyan/10 pointer-events-none" />
+                <div className="absolute top-1.5 left-1.5 text-[8px] font-mono text-brand-cyan font-bold bg-black/60 px-1.5 py-0.5 rounded-md border border-brand-cyan/20 backdrop-blur-sm">
+                  REC • 1080p
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Active Alerts List (Right 1 col) */}
-          <div className="border border-brand-border bg-brand-card rounded-xl p-5 shadow-lg glass-panel flex flex-col gap-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-brand-border">
-              <ShieldAlert className="text-brand-danger w-5 h-5 animate-pulse" />
-              <h3 className="font-black text-xs text-brand-text tracking-wide uppercase">Active Safety Alerts</h3>
+              </div>
             </div>
+          );
+        })}
+      </div>
 
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {alerts.map((alert, idx) => {
-                const isCritical = alert.severity === "CRITICAL" || alert.severity === "WARNING";
-                const borderCol = isCritical ? "border-brand-danger" : "border-brand-accent";
-                
-                return (
-                  <div 
-                    key={idx} 
-                    className={`bg-brand-app border-l-4 ${borderCol} border border-brand-border/60 rounded p-3 text-[11px] font-semibold shadow-sm`}
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-extrabold uppercase text-brand-text">{alert.category}</span>
-                      <span className="text-[9px] text-brand-muted">{formatTimestamp(alert.timestamp)}</span>
-                    </div>
-                    <p className="text-brand-muted leading-relaxed mb-1">{alert.message}</p>
-                    <div className="flex justify-between text-[9px] text-brand-muted">
-                      <span>Cam: {alert.camera}</span>
-                      <span className={isCritical ? "text-brand-danger font-bold" : "text-brand-accent font-bold"}>
-                        {alert.severity}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-              {alerts.length === 0 && (
-                <span className="text-xs text-brand-muted italic font-semibold text-center block py-10">
-                  No camera warnings detected.
-                </span>
-              )}
+      {/* Live AI Vision Threat Alerts Stream */}
+      <div className="p-3.5 surface-elevated rounded-2xl border border-brand-borderSubtle space-y-2">
+        <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block font-mono">
+          Recent Edge Detection Events ({alerts.length})
+        </span>
+
+        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+          {alerts.map((al, idx) => (
+            <div 
+              key={idx} 
+              className="p-2 surface-base rounded-xl border border-brand-borderSubtle flex items-center justify-between text-[10.5px]"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <ShieldAlert className="w-3.5 h-3.5 text-brand-warning flex-shrink-0" />
+                <span className="font-bold text-brand-text truncate">{al.message || al.category}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[9px] text-brand-muted flex-shrink-0 font-mono">
+                <span>{al.camera}</span>
+                <span>{formatTimestamp(al.timestamp)}</span>
+              </div>
             </div>
-          </div>
+          ))}
+          {alerts.length === 0 && (
+            <div className="text-center py-3 text-[10px] text-brand-muted italic font-mono">
+              All sectors clear. No safety or stowage anomalies detected.
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
+

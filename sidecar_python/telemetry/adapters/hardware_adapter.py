@@ -1,14 +1,21 @@
 """
 Hardware Serial Telemetry Adapter for MareTide.
 Communicates with physical ESP32 microcontrollers over UART / COM ports,
-decodes incoming JSON telemetry packets, handles disconnections and auto-reconnection.
+decodes incoming JSON telemetry packets (including multi-line blocks, --- delimiters, and boot messages),
+handles disconnections and auto-reconnection.
+
+CRITICAL INVARIANT:
+The ESP32 sketch (esp32_sensor_sketch.ino) includes an HX711 load-cell interface (cargo_kg).
+In accordance with MareTide maritime safety architecture, load-cell data is quarantined
+and NEVER used as container cargo weight, gross mass, or input into stability calculations
+or stowage optimization. Container cargo weight originates exclusively from SOLAS Document AI.
 """
 
 import threading
 import time
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 import serial
 import serial.tools.list_ports
 
@@ -18,9 +25,73 @@ from telemetry.models import TelemetrySource, ConnectionStatus
 logger = logging.getLogger("telemetry.hardware")
 
 
+def extract_json_from_buffer(buffer: str) -> Tuple[List[Dict[str, Any]], str]:
+    """
+    Extracts all complete JSON dictionaries from a continuous serial stream buffer.
+    Handles:
+      1. Single-line JSON Lines (e.g. {"roll": 1.0, "pitch": 0.5}\\n)
+      2. Multi-line JSON blocks bounded by '{' and '}' spanning newlines as output by esp32_sensor_sketch.ino
+      3. Delimiters such as '---'
+      4. Boot banners ('MPU6050: OK', 'NAVI-AI ESP32 Ready') and warning/status text
+    Returns:
+      (extracted_json_list, remaining_buffer)
+    """
+    packets: List[Dict[str, Any]] = []
+    
+    while "{" in buffer:
+        start_idx = buffer.find("{")
+        # Discard non-JSON leading text/banners
+        if start_idx > 0:
+            buffer = buffer[start_idx:]
+            start_idx = 0
+            
+        depth = 0
+        in_string = False
+        escape = False
+        end_idx = -1
+        
+        for i, char in enumerate(buffer):
+            if char == '"' and not escape:
+                in_string = not in_string
+            elif not in_string:
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end_idx = i
+                        break
+            
+            if char == '\\' and not escape:
+                escape = True
+            else:
+                escape = False
+                
+        if end_idx != -1:
+            json_str = buffer[:end_idx + 1]
+            buffer = buffer[end_idx + 1:]
+            try:
+                parsed = json.loads(json_str)
+                if isinstance(parsed, dict):
+                    packets.append(parsed)
+            except json.JSONDecodeError:
+                # Corrupted block or partial slice, discard leading '{' to proceed
+                buffer = buffer[1:] if len(buffer) > 0 else ""
+        else:
+            # Incomplete JSON block still accumulating in serial buffer
+            if len(buffer) > 8192:
+                # Prevent buffer overflow from malformed open brace
+                buffer = buffer[1:]
+            break
+            
+    return packets, buffer
+
+
 class HardwareSerialAdapter(BaseTelemetryAdapter):
     """
     Hardware adapter connecting to ESP32 over serial UART.
+    Supports auto-discovery, multi-line JSON stream extraction,
+    and automatic reconnection.
     """
 
     def __init__(
@@ -94,7 +165,7 @@ class HardwareSerialAdapter(BaseTelemetryAdapter):
             return self._latest_raw.copy()
 
     def send_command(self, command: str, **kwargs) -> bool:
-        """Dispatches an ASCII command to the ESP32 (e.g. 'DRAIN:24.0\n')."""
+        """Dispatches an ASCII command to the ESP32 (e.g. 'DRAIN:24.0\\n')."""
         with self._lock:
             if not self._connected or not self.ser or not self.ser.is_open:
                 logger.warning("Cannot send command: hardware port not connected")
@@ -167,18 +238,13 @@ class HardwareSerialAdapter(BaseTelemetryAdapter):
                     raw_chunk = self.ser.read(self.ser.in_waiting).decode("utf-8", errors="ignore")
                     buffer += raw_chunk
 
-                    while "\n" in buffer:
-                        line, buffer = buffer.split("\n", 1)
-                        line = line.strip()
-                        if line.startswith("{") and line.endswith("}"):
-                            try:
-                                parsed = json.loads(line)
-                                with self._lock:
-                                    self._latest_raw = parsed
-                                    self._last_read_time = time.time()
-                                    self._packet_count += 1
-                            except json.JSONDecodeError:
-                                pass  # Incomplete JSON fragment
+                    # Extract complete JSON dictionaries (handling multi-line blocks & banners)
+                    packets, buffer = extract_json_from_buffer(buffer)
+                    for parsed in packets:
+                        with self._lock:
+                            self._latest_raw = parsed
+                            self._last_read_time = time.time()
+                            self._packet_count += 1
             except (serial.SerialException, OSError) as e:
                 logger.warning(f"Serial connection lost on port {self.port}: {e}")
                 with self._lock:
